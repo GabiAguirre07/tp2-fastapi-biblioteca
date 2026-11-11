@@ -1,0 +1,18 @@
+# Entorno virtual
+.venv/
+
+# Archivos compilados de Python
+__pycache__/
+*.pyc
+
+# Variables de entorno
+.env
+
+# Configuración local del editor
+.vscode/
+
+# Lineas propias del TP 2
+*.db
+.coverage
+htmlcov/
+.pytest_cache/
