@@ -1,5 +1,91 @@
 # TP N°2 Python — Sistema de Biblioteca
 
-API REST para gestionar el catálogo de una biblioteca y sus préstamos, desarrollada con **FastAPI** y **SQLModel** para el Trabajo Práctico N°2.
+API REST para gestionar el catálogo de una biblioteca (autores, libros y socios) y sus préstamos. Está desarrollada con **FastAPI** y **SQLModel** sobre **SQLite** para el Trabajo Práctico N°2.
 
-> 🚧 Proyecto en desarrollo. La documentación completa (instalación, endpoints y tests) se agrega al finalizar.
+## Estado del desarrollo
+
+| Etapa | Contenido | Estado |
+|---|---|---|
+| 0 | Repositorio y entorno | Finalizada |
+| 1 | Modelos y base de datos | Finalizada |
+| 2 | CRUD de Autor, Libro y Socio | Finalizada |
+| 3 | Relaciones y consultas | Pendiente |
+| 4 | Préstamos y reglas de negocio | Pendiente |
+| 5 | Tests y cobertura | Pendiente |
+| 6 | README final y entrega | Pendiente |
+
+Hoy la aplicación crea la base de datos con las cinco tablas y expone el CRUD completo de autores, libros y socios. Los endpoints de relaciones (Etapa 3) y de préstamos (Etapa 4) se agregan más adelante.
+
+## Requisitos
+
+- **Python 3.10 o superior**.
+- `pip` (viene con Python). No hace falta instalar ni configurar ningún servidor de base de datos: SQLite ya viene incluido en Python.
+
+## Instalación y ejecución
+
+Los comandos se ejecutan desde la carpeta del proyecto. Los dos primeros pasos cambian según la terminal.
+
+**Windows (PowerShell)**
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Si PowerShell bloquea la activación por la política de ejecución, habilitarla solo para esa ventana con
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` y volver a activar.
+
+**Linux / macOS (bash o zsh)**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+**Luego, en cualquiera de los dos sistemas**
+
+```bash
+pip install -r requirements.txt
+python -m uvicorn main:app --reload
+```
+
+Con la aplicación en marcha, abrir <http://127.0.0.1:8000/docs> para ver Swagger. El archivo `biblioteca.db` se crea solo, junto al código, la primera vez que arranca (no hace falta ningún paso manual ni variables de entorno).
+
+Para detener la aplicación: `Ctrl + C`.
+
+## Endpoints disponibles
+
+Cada recurso ofrece alta (`POST`), listado (`GET`), consulta por id (`GET /{id}`), modificación parcial (`PATCH /{id}`) y baja (`DELETE /{id}`). El listado admite paginación con `?skip=0&limit=100` (máximo 100) y viene ordenado por id.
+
+| Recurso | Reglas destacadas |
+|---|---|
+| `/autores` | Nombre y nacionalidad obligatorios. No se puede borrar un autor con libros asociados (409). |
+| `/libros` | El ISBN es único (409) y se guarda sin guiones. Stock mayor o igual a 0 y año entre 1450 y el año actual. No se puede borrar un libro con préstamos (409). |
+| `/socios` | El email es único sin distinguir mayúsculas (409) y se guarda en minúsculas. No se puede borrar un socio con préstamos (409). |
+
+Códigos de respuesta: **201** alta, **200** consulta y modificación, **204** baja, **404** el recurso no existe, **409** conflicto (duplicado o borrado no permitido) y **422** datos inválidos.
+
+**Para probar desde Swagger:** al cargar un socio, usar un email con un dominio real o de ejemplo (`ana@example.com`). Los dominios reservados como `.test`, `.local` o `localhost` se rechazan con 422.
+
+## Chequeos de calidad (desarrollo)
+
+Con el entorno virtual activado:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pycodestyle .
+python -m pyright
+```
+
+`pycodestyle` no debe imprimir nada y `pyright` debe terminar con `0 errors`. La configuración de `pycodestyle` está en `setup.cfg` (líneas de hasta 88 caracteres).
+
+Los tests (`pytest`) se incorporan en la Etapa 5.
+
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [docs/modelo-de-datos.md](docs/modelo-de-datos.md) | Tablas, campos, restricciones y diagrama entidad-relación |
+| [docs/decisiones-de-diseno.md](docs/decisiones-de-diseno.md) | Decisiones que la consigna no fija, con su fundamento |
+| [docs/estructura-del-proyecto.md](docs/estructura-del-proyecto.md) | Carpetas, archivos y responsabilidad de cada uno |
+| [docs/como-verificar.md](docs/como-verificar.md) | Qué comprobar en cada etapa y cómo hacerlo |
