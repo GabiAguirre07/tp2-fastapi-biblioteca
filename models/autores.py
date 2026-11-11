@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class AutorBase(SQLModel):
-    """Campos de negocio de un autor, compartidos por la tabla y los esquemas."""
+    """Campos de un autor, compartidos por la tabla y los esquemas."""
 
     nombre: str = Field(index=True)
     nacionalidad: str

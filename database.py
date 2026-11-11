@@ -5,6 +5,7 @@ la sesión por inyección de dependencias y nunca cree conexiones propias.
 """
 
 import sqlite3
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends
@@ -20,7 +21,9 @@ engine = create_engine(URL_BASE_DE_DATOS, connect_args={"check_same_thread": Fal
 
 
 @event.listens_for(Engine, "connect")
-def activar_claves_foraneas(dbapi_connection, connection_record):
+def activar_claves_foraneas(
+    dbapi_connection: object, connection_record: object
+) -> None:
     """Activa la validación de claves foráneas en cada conexión nueva.
 
     SQLite no las valida por defecto: sin esto aceptaría, por ejemplo, un
@@ -34,12 +37,12 @@ def activar_claves_foraneas(dbapi_connection, connection_record):
 
 
 def crear_tablas() -> None:
-    """Crea en la base las tablas de todos los modelos importados, si no existen."""
+    """Crea las tablas de todos los modelos importados, si no existen."""
     SQLModel.metadata.create_all(engine)
 
 
-def obtener_sesion():
-    """Entrega una sesión de base de datos por petición y la cierra al terminar."""
+def obtener_sesion() -> Iterator[Session]:
+    """Entrega una sesión por petición y la cierra al terminar."""
     with Session(engine) as sesion:
         yield sesion
 

@@ -1,5 +1,6 @@
-"""Punto de entrada de la API: crea la aplicación y prepara la base de datos."""
+"""Punto de entrada de la API: crea la app y prepara la base de datos."""
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,7 +12,7 @@ from database import crear_tablas
 
 
 @asynccontextmanager
-async def ciclo_de_vida(app: FastAPI):
+async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
     """Crea las tablas al iniciar la aplicación."""
     crear_tablas()
     yield

@@ -1,4 +1,4 @@
-"""Modelos de datos. Importa todas las tablas para registrarlas en la metadata."""
+"""Modelos de datos: importa las tablas para registrarlas en la metadata."""
 
 from models.autores import Autor, AutorBase
 from models.libro_autor import LibroAutor
