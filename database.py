@@ -6,14 +6,18 @@ la sesión por inyección de dependencias y nunca cree conexiones propias.
 
 import sqlite3
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy import event
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import URL, Engine
 from sqlmodel import Session, SQLModel, create_engine
 
-URL_BASE_DE_DATOS = "sqlite:///biblioteca.db"
+# La base se guarda junto al código, sin importar desde qué carpeta se lance
+# la app: así se comporta igual en Windows, Linux y macOS.
+RUTA_BASE_DE_DATOS = Path(__file__).resolve().parent / "biblioteca.db"
+URL_BASE_DE_DATOS = URL.create("sqlite", database=str(RUTA_BASE_DE_DATOS))
 
 # check_same_thread=False: FastAPI atiende los pedidos en distintos hilos y
 # SQLite, por defecto, solo permite usar una conexión en el hilo que la creó.
