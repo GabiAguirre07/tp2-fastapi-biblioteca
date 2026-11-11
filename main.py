@@ -9,6 +9,8 @@ from fastapi import FastAPI
 # en la metadata; sin esto create_all no sabría qué tablas crear.
 import models  # noqa: F401
 from database import crear_tablas
+from routers import autores, libros, socios
+from routers.manejadores import registrar_manejadores
 
 
 @asynccontextmanager
@@ -19,3 +21,8 @@ async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Sistema de Biblioteca", lifespan=ciclo_de_vida)
+
+registrar_manejadores(app)
+app.include_router(autores.router)
+app.include_router(libros.router)
+app.include_router(socios.router)

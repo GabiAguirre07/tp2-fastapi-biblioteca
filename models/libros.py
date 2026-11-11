@@ -1,4 +1,4 @@
-"""Modelos de la entidad Libro."""
+"""Modelos y esquemas de la entidad Libro."""
 
 from datetime import date
 from typing import TYPE_CHECKING
@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import CheckConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
+from models.comunes import ActualizacionParcial, IsbnTexto, TituloTexto
 from models.libro_autor import LibroAutor
 
 if TYPE_CHECKING:
@@ -25,8 +26,8 @@ class LibroBase(SQLModel):
     entre ANIO_MINIMO y el año actual.
     """
 
-    titulo: str = Field(index=True)
-    isbn: str = Field(unique=True, index=True)
+    titulo: TituloTexto = Field(index=True)
+    isbn: IsbnTexto = Field(unique=True, index=True)
     stock: int = Field(ge=0)
     anio: int = Field(ge=ANIO_MINIMO, le=ANIO_ACTUAL)
 
@@ -49,3 +50,22 @@ class Libro(LibroBase, table=True):
         back_populates="libros", link_model=LibroAutor
     )
     prestamos: list["Prestamo"] = Relationship(back_populates="libro")
+
+
+class LibroCrear(LibroBase):
+    """Esquema de entrada para el alta: el cliente no envía el id."""
+
+
+class LibroActualizar(ActualizacionParcial):
+    """Esquema de entrada para la modificación parcial de un libro."""
+
+    titulo: TituloTexto | None = None
+    isbn: IsbnTexto | None = None
+    stock: int | None = Field(default=None, ge=0)
+    anio: int | None = Field(default=None, ge=ANIO_MINIMO, le=ANIO_ACTUAL)
+
+
+class LibroLeer(LibroBase):
+    """Esquema de salida: los campos del libro más su id."""
+
+    id: int
