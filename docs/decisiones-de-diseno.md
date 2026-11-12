@@ -164,9 +164,16 @@ La suite tiene **272 tests** y una cobertura de **99,80 %**. Además de la cober
 81. **Los tests de concurrencia dependen de SQLite** (bloqueo de escritura de toda la base, decisión 61). En otro motor harían falta otras garantías y otros tests.
 82. **El porcentaje no mide la calidad por sí solo.** Un 99,8 % indica qué líneas se ejecutan, no que cada una se compruebe: por eso se sumó la prueba con modificaciones deliberadas descrita arriba.
 
-## Etapa 7: roles (bibliotecario y socio)
+## Etapa 6: revisión y entrega
 
-Nota de numeración: las decisiones 83 a 88 (cierre de la Etapa 6) se incorporan a este archivo en el cierre final de la entrega; la Etapa 7 sigue desde la 89.
+83. **El README final se escribió después de la Etapa 7**, para describir una sola vez el producto terminado (con roles) en lugar de reescribirlo dos veces.
+84. **README pensado para quien evalúa:** sin tabla de etapas, con instalación en PowerShell y bash, un recorrido de 5 minutos en `/docs` y el mapa de la consigna en `docs/cumplimiento-de-la-consigna.md` (consigna → implementación → test), para que cada punto de la rúbrica se pueda comprobar rápido.
+85. **Regla 5 (multa) y vencidos: se documentan y se señalan los tests, sin cambiar el código.** Como la fecha la decide el servidor (decisión 44), una multa mayor a 0 no se produce el mismo día desde Swagger; el README da el comando que la comprueba (`python -m pytest tests/test_reglas_de_negocio.py -k "regla_4 or regla_5" -v --no-cov`).
+86. **La modificación es solo con `PATCH`** (decisión 26, sin `PUT`), declarado de forma explícita en el README.
+87. **El email al profesor se envía después de la Etapa 7**, con el repositorio ya terminado.
+88. **El email de autor de los commits se corrigió hacia adelante** (los primeros 14 commits quedaron con un email mal escrito, sin el punto antes de `com`): se prefirió no reescribir el historial ya publicado.
+
+## Etapa 7: roles (bibliotecario y socio)
 
 ### Confirmadas por Gabriel
 
@@ -198,3 +205,7 @@ Nota de numeración: las decisiones 83 a 88 (cierre de la Etapa 6) se incorporan
 ### Resultado y verificación
 
 La suite pasa a **339 tests** (272 anteriores sin modificar y 67 nuevos en `tests/test_seguridad.py`) con una cobertura de **99,82 %**. Se comprobó que los tests detectan errores reales: 12 modificaciones deliberadas de la autorización (quitar la exigencia de bibliotecario, quitar la comprobación de propietario, invertir reglas, aceptar dígitos no ASCII, etc.) fueron detectadas, y un recorrido de 50 llamadas `curl` contra la app real dio los códigos esperados sin errores 500.
+
+## Cierre de la entrega
+
+107. **Las herramientas de desarrollo también llevan rango de versiones** en `requirements-dev.txt` (`pycodestyle>=2.15,<3.0` y `pyright>=1.1.414,<2.0`), igual que el resto: una versión futura no puede cambiar el resultado de los chequeos al evaluar. Cada piso es la versión contra la que se probó.
