@@ -10,11 +10,11 @@ API REST para gestionar el catálogo de una biblioteca (autores, libros y socios
 | 1 | Modelos y base de datos | Finalizada |
 | 2 | CRUD de Autor, Libro y Socio | Finalizada |
 | 3 | Relaciones y consultas | Finalizada |
-| 4 | Préstamos y reglas de negocio | Pendiente |
+| 4 | Préstamos y reglas de negocio | Finalizada |
 | 5 | Tests y cobertura | Pendiente |
 | 6 | README final y entrega | Pendiente |
 
-Hoy la aplicación crea la base de datos con las cinco tablas, expone el CRUD completo de autores, libros y socios, permite asociar autores a los libros y filtrar los libros disponibles. Los endpoints de préstamos (Etapa 4) se agregan más adelante.
+Hoy la aplicación crea la base de datos con las cinco tablas, expone el CRUD completo de autores, libros y socios, permite asociar autores a los libros y filtrar los libros disponibles, y registra préstamos y devoluciones aplicando las reglas de negocio (máximo de préstamos, stock, socio inactivo, vencimiento y multa).
 
 ## Requisitos
 
@@ -73,7 +73,18 @@ Cada recurso ofrece alta (`POST`), listado (`GET`), consulta por id (`GET /{id}`
 
 Los dos últimos no los pide la consigna: se agregaron para poder deshacer una asociación y para ver qué libros impiden borrar un autor.
 
-Códigos de respuesta: **201** alta, **200** consulta y modificación, **204** baja, **404** el recurso no existe, **409** conflicto (duplicado, asociación repetida o borrado no permitido) y **422** datos inválidos.
+### Préstamos
+
+| Endpoint | Qué hace | Códigos |
+|---|---|---|
+| `POST /prestamos` | Registra un préstamo (`{"socio_id": 1, "libro_id": 1}`): descuenta 1 del stock y fija el vencimiento a 14 días | 201, 403 (socio inactivo), 404 (socio o libro inexistente), 409 (3 préstamos activos o libro sin stock), 422 |
+| `POST /prestamos/{prestamo_id}/devolucion` | Registra la devolución: repone 1 al stock y calcula la multa | 200, 404, 409 (ya estaba devuelto) |
+| `GET /socios/{socio_id}/prestamos` | Lista paginada de los préstamos del socio. `?activos=true` solo los no devueltos, `?activos=false` solo los devueltos, sin el parámetro todos | 200, 404, 422 |
+| `GET /prestamos/{prestamo_id}` | Consulta un préstamo (no lo pide la consigna) | 200, 404 |
+
+Las fechas las decide el servidor (el cliente no las envía). La multa es de **$100 por cada día de atraso** respecto del vencimiento. Cada préstamo se devuelve con dos datos calculados al responder, `vencido` y `dias_atraso`, que informan pero **no bloquean** nada.
+
+Códigos de respuesta: **201** alta, **200** consulta y modificación, **204** baja, **403** el socio no está habilitado (inactivo), **404** el recurso no existe, **409** conflicto (duplicado, asociación repetida, regla de préstamo incumplida o borrado no permitido) y **422** datos inválidos.
 
 **Para probar desde Swagger:** al cargar un socio, usar un email con un dominio real o de ejemplo (`ana@example.com`). Los dominios reservados como `.test`, `.local` o `localhost` se rechazan con 422.
 

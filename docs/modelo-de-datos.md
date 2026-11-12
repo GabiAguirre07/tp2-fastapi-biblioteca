@@ -102,7 +102,9 @@ En el código, cada lado de la relación se navega con un atributo: `Autor.libro
 | `fecha_prestamo` | fecha | Obligatoria. |
 | `fecha_vencimiento` | fecha | Obligatoria. La calcula la capa de servicios (fecha del préstamo + 14 días). |
 | `fecha_devolucion` | fecha | Opcional (`NULL`). Un préstamo está **activo** mientras sea nula. |
-| `multa` | entero | Obligatoria. Valor por defecto `0`. La calcula la capa de servicios al devolver. |
+| `multa` | entero | Obligatoria. Valor por defecto `0`. La calcula la capa de servicios al devolver ($100 por día de atraso). |
+
+La tabla no guarda si el préstamo está vencido ni cuántos días de atraso lleva: son datos que cambian cada día, así que se calculan al responder (ver más abajo). Lo único que se persiste al devolver es `fecha_devolucion` y `multa`.
 
 ## Dos niveles de protección de los datos
 
@@ -130,6 +132,8 @@ Cada entidad tiene, además de su tabla, clases que definen lo que entra y lo qu
 | `...Leer` | Salida: los campos más el `id` | `AutorLeer` |
 
 `LibroLeer` suma además el campo `autores`, una lista de `AutorLeer` (`id`, `nombre` y `nacionalidad`), de modo que toda respuesta de libro incluye sus autores. `AutorLeer` no incluye los libros del autor (evita referencias circulares); se consultan con `GET /autores/{autor_id}/libros`.
+
+`PrestamoCrear` solo tiene `socio_id` y `libro_id`: las fechas y la multa las decide el servidor. Si el cuerpo trae otros campos, se ignoran. `PrestamoLeer` repite los campos de la tabla y suma dos datos calculados al responder: `vencido` (verdadero solo si el préstamo sigue sin devolverse y ya pasó su vencimiento) y `dias_atraso` (los días transcurridos después del vencimiento: hasta hoy si está activo, o hasta la devolución si ya se devolvió).
 
 ### Reglas de validación de los campos
 

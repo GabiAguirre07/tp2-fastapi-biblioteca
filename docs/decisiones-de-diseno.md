@@ -88,3 +88,44 @@ La consigna manda sobre cualquier otra referencia: se respeta su estructura de c
 ### Limitación conocida
 
 43. **Ventana mínima en la asociación.** Si otro cliente borra el autor o el libro justo entre la comprobación de que existen y la inserción del vínculo, el error de clave foránea se informaría como 409 («ya está asociado») en lugar de 404. No es alcanzable en el uso normal de la aplicación y no se trata.
+
+## Etapa 4: préstamos y reglas de negocio
+
+### Fechas, multa y vencimientos
+
+44. **Las fechas las decide solo el servidor.** `fecha_prestamo` y `fecha_devolucion` valen la fecha de hoy y el cliente no las envía; los campos extra del cuerpo se ignoran. Es el contrato de la consigna y no permite retrodatar un préstamo. El costo es que la multa con atraso real solo se puede probar con tests (ver la decisión 60).
+45. **Multa y plazo.** El vencimiento es `fecha_prestamo` + 14 días y la multa es $100 por cada día calendario entre el vencimiento y la devolución. Devolver el día del vencimiento o antes da multa 0, la multa no tiene tope y **no bloquea** futuros préstamos (no hay endpoint de pago, así que no habría forma de levantar un bloqueo). Las tres cifras (`PLAZO_DIAS`, `MULTA_POR_DIA` y `MAXIMO_ACTIVOS`) son constantes al inicio de `services/prestamos.py`: un único lugar para cambiarlas.
+46. **Los préstamos vencidos solo se informan.** Cada respuesta trae `vencido` y `dias_atraso`. Un préstamo vencido sigue siendo activo y cuenta para el máximo de 3. No se inventan reglas que la consigna no pide.
+47. **`vencido` y `dias_atraso` se calculan, no se guardan.** Guardarlos obligaría a actualizar la base todos los días. Si el préstamo está activo, el atraso se mide hasta hoy; si ya se devolvió, hasta su fecha de devolución, y nunca figura como vencido. Lo único que se persiste al devolver es `fecha_devolucion` y `multa`, un dato histórico que no cambia después.
+
+### Reglas
+
+48. **Orden de las validaciones al prestar:** socio inexistente (404), libro inexistente (404), socio inactivo (403), 3 préstamos activos (409) y libro sin stock (409). Primero existencia, luego permiso, luego los límites del socio y por último el recurso: para un mismo caso el cliente siempre recibe el mismo error.
+49. **El mismo libro se puede prestar varias veces al mismo socio.** La consigna no lo prohíbe y es lo que usará quien evalúe para probar el máximo de 3 préstamos.
+50. **Devolver no exige que el socio esté activo.** Un socio dado de baja sigue teniendo libros en su poder y debe poder devolverlos.
+51. **El 403 usa una excepción genérica** (`OperacionNoPermitida`) y no una específica de socios inactivos, para que la misma sirva a la autorización por roles de una etapa futura. Se suma al diccionario `CODIGOS_HTTP` con una línea; el manejador no cambia.
+
+### Consistencia de los datos
+
+52. **Descuento de stock atómico.** El stock se descuenta con un solo `UPDATE ... SET stock = stock - 1 WHERE stock > 0` y se comprueba cuántas filas modificó. Restar en Python (leer, restar, guardar) dejaría una ventana en la que dos pedidos simultáneos se llevan el último ejemplar. Ese `UPDATE` además toma el bloqueo de escritura de SQLite, que serializa los pedidos y permite contar los préstamos activos del socio dentro de la misma transacción sin que el número cambie hasta confirmar: el máximo de 3 no se puede superar ni con pedidos simultáneos. Se comprobó con 25 pedidos simultáneos por un ejemplar (1 × 201 y 24 × 409) y 30 de un mismo socio (3 × 201 y 27 × 409).
+53. **Un solo `commit` por operación (`transaccion`).** Prestar toca dos tablas (stock y préstamo); con dos `commit` separados, una falla en el medio dejaría el stock descontado sin préstamo. `transaccion()` es un administrador de contexto en `services/comunes.py`: confirma todo al salir del bloque y, ante cualquier excepción, deshace todo y la vuelve a lanzar. `guardar()` y `eliminar()` no cambian. Por eso un 409 por límite o por stock nunca deja el stock descontado.
+54. **La devolución también es atómica.** Marcar el préstamo como devuelto es un `UPDATE` condicional (`WHERE fecha_devolucion IS NULL`): dos devoluciones simultáneas del mismo préstamo no pueden reponer el stock dos veces (20 pedidos simultáneos: 1 × 200 y 19 × 409).
+
+### Estructura y respuestas
+
+55. **Esquemas planos con ids.** `PrestamoLeer` devuelve `socio_id` y `libro_id`, no los objetos completos: sin consultas extra, y el socio y el libro se consultan con sus propios `GET`. `PrestamoLeer` repite los campos de la tabla en lugar de heredar de una clase base compartida, porque la herencia movía la columna `id` al final del `CREATE TABLE`; así la tabla no cambia.
+56. **«Hoy» es una dependencia inyectada.** Los servicios no llaman a `date.today()`: reciben la fecha. `FechaHoyDep` la entrega en los endpoints y los tests la reemplazan con `dependency_overrides` para «viajar en el tiempo» sin esperar días reales, igual que ya se reemplaza la sesión de la base.
+57. **El listado de un socio vive en `services/prestamos.py`** y su endpoint en `routers/socios.py`: la ruta cuelga de `/socios` (consigna), pero el dato y el cálculo de `vencido` pertenecen al dominio de préstamos. El filtro `activos` es tri-estado como `disponibles` (decisión 40): `true` sin devolver, `false` devueltos, omitido todos, aplicado en SQL antes de `skip` y `limit`.
+58. **Códigos y endpoint extra.** `POST /prestamos` responde 201 y `POST /prestamos/{id}/devolucion` responde 200 con el préstamo actualizado (no crea un recurso, modifica uno). `GET /prestamos/{id}` no lo pide la consigna: con el id que devuelve el alta se ve el estado exacto de un préstamo desde Swagger.
+59. **La tabla `prestamo` no se modificó.** Todo cambio pasa por el servicio; una base creada en la Etapa 3 sigue siendo válida. Los endpoints cargan el libro del préstamo con sus autores (`lazy="selectin"`, decisión 39): son 7 consultas SQL por préstamo, un costo ínfimo que no justifica código adicional.
+
+### Corrección a etapas anteriores
+
+Al probar los ids límite se vio que, desde la Etapa 2, `GET /socios/99999999999999999999` (un id mayor que el máximo entero de SQLite) y `GET /libros?skip=99999999999999999999` daban **500** por un `OverflowError`. Ahora `obtener_o_404` informa como inexistente (404) cualquier id fuera del rango de SQLite sin consultar la base, y `skip` tiene como tope ese mismo máximo (422). Afectaba a todas las rutas con id y a `POST /prestamos` con ids enormes.
+
+### Limitaciones conocidas
+
+60. **La multa con atraso real no se puede reproducir desde Swagger el mismo día.** Con la fecha decidida por el servidor (decisión 44), una multa mayor a 0 o un préstamo con `vencido: true` requieren que pasen los 14 días. Esas reglas se verifican con pruebas que reemplazan la fecha de hoy (multas de −5 a 366 días de atraso) y las cubrirán los tests.
+61. **La garantía de concurrencia es la de SQLite.** El bloqueo de escritura de SQLite es de toda la base y es lo que protege el máximo de 3 incluso entre libros distintos. En otro motor (por ejemplo PostgreSQL) el `UPDATE` solo bloquearía la fila del libro y habría que bloquear además la fila del socio.
+62. **Ventana mínima con el estado del socio.** El campo `activo` se lee antes de empezar la transacción: si otro cliente desactiva al socio en ese instante exacto, ese préstamo se concedería. No afecta al stock ni al máximo de 3, no es alcanzable en el uso normal y no se trata.
+63. **«Hoy» es la fecha local del servidor** (`date.today()`): lo esperable para quien lo ejecuta en su computadora; en un servidor de otra zona horaria el día cambia a la medianoche de esa zona.

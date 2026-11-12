@@ -140,7 +140,7 @@ Probar cada cuerpo y comprobar que la respuesta es 422 y que no se guarda nada:
 | `GET /socios/1` | 404 (ya no existe) |
 | `DELETE /socios/1` | 404 |
 
-Las bajas protegidas (409) son: un autor con libros asociados y un libro o socio con préstamos. La de autores se prueba desde la Etapa 3 (punto 18); la de libros y socios con préstamos **todavía no se puede provocar desde Swagger**, porque los préstamos se crean en la Etapa 4. Mientras tanto se verificó insertando los registros directamente en la base.
+Las bajas protegidas (409) son: un autor con libros asociados y un libro o socio con préstamos. La de autores se prueba desde la Etapa 3 (punto 18); la de libros y socios con préstamos se prueba desde la Etapa 4 (punto 24).
 
 ### 13. Calidad del código
 
@@ -205,6 +205,74 @@ El filtro se aplica antes de paginar: `skip` y `limit` cuentan sobre los libros 
 
 Igual que en el punto 6: `python -m pycodestyle .` no imprime nada y `python -m pyright` informa `0 errors`.
 
+## Etapa 4: préstamos y reglas de negocio
+
+Se prueba desde Swagger con la aplicación en marcha. Los `id` dependen de lo que ya haya en la base: usar siempre los que devuelve cada alta (aquí se los nombra: `{ana}`, `{beto}`, `{L1}`, etc.). Para partir de una base limpia, detener la aplicación y borrar `biblioteca.db`. Hay que tener en cuenta que **las fechas las decide el servidor**: `fecha_prestamo` es la de hoy.
+
+### 20. Preparar los datos
+
+| Endpoint | Cuerpo | Resultado esperado |
+|---|---|---|
+| `POST /socios` | `{"nombre": "Ana Pérez", "email": "ana@example.com"}` | 201 (`{ana}`) |
+| `POST /socios` | `{"nombre": "Beto Gómez", "email": "beto@example.com", "activo": false}` | 201 (`{beto}`, inactivo) |
+| `POST /libros` | `{"titulo": "L1", "isbn": "9780000000011", "stock": 2, "anio": 2000}` | 201 (`{L1}`) |
+| `POST /libros` | `{"titulo": "L2", "isbn": "9780000000028", "stock": 1, "anio": 2000}` | 201 (`{L2}`) |
+| `POST /libros` | `{"titulo": "L3", "isbn": "9780000000035", "stock": 0, "anio": 2000}` | 201 (`{L3}`) |
+| `POST /libros` | `{"titulo": "L4", "isbn": "9780000000042", "stock": 5, "anio": 2000}` | 201 (`{L4}`) |
+| `POST /libros` | `{"titulo": "L5", "isbn": "9780000000059", "stock": 5, "anio": 2000}` | 201 (`{L5}`) |
+
+### 21. Prestar y reglas del alta
+
+| Endpoint | Cuerpo | Resultado esperado |
+|---|---|---|
+| `POST /prestamos` | `{"socio_id": {ana}, "libro_id": {L1}}` | 201: `fecha_vencimiento` = hoy + 14 días, `fecha_devolucion` nula, `multa` 0, `vencido` false, `dias_atraso` 0 |
+| `GET /libros/{L1}` | — | `stock` pasó de 2 a 1 |
+| `POST /prestamos` | socio `{beto}` y libro `{L1}` | 403: el socio está inactivo |
+| `POST /prestamos` | socio `{ana}` y libro `{L3}` (stock 0) | 409: no tiene ejemplares disponibles |
+| `POST /prestamos` | socio `9999`; luego libro `9999` | 404 en ambos casos |
+| `POST /prestamos` | `{ana}` pide `{L4}` y después `{L5}` | 201 y 201 (ya tiene 3 activos) |
+| `POST /prestamos` | `{ana}` pide `{L2}` | 409: ya tiene 3 préstamos activos. `GET /libros/{L2}` sigue con stock 1 |
+
+### 22. Listar los préstamos de un socio
+
+| Endpoint | Resultado esperado |
+|---|---|
+| `GET /socios/{ana}/prestamos?activos=true` | Los 3 préstamos |
+| `GET /socios/9999/prestamos` | 404 |
+
+### 23. Devolver
+
+| Endpoint | Resultado esperado |
+|---|---|
+| `POST /prestamos/{id del préstamo de L1}/devolucion` | 200: `fecha_devolucion` = hoy, `multa` 0. `GET /libros/{L1}` vuelve a stock 2 |
+| el mismo `POST` repetido | 409: el préstamo ya fue devuelto; el stock sigue en 2 |
+| `POST /prestamos/9999/devolucion` | 404 |
+| `GET /socios/{ana}/prestamos` con `activos=true`, `activos=false` y sin parámetro | 2, 1 y 3 préstamos |
+| `POST /prestamos` de `{ana}` con `{L2}` y luego de `{beto}` (reactivado con `PATCH /socios/{beto}` `{"activo": true}`) con `{L2}` | 201 y 409 (el último ejemplar ya está prestado) |
+| `GET /prestamos/{id}` y `GET /prestamos/9999` | 200 y 404 |
+
+### 24. Borrados protegidos por los préstamos
+
+| Endpoint | Resultado esperado |
+|---|---|
+| `DELETE /libros/{L1}` | 409: tiene préstamos, incluso uno ya devuelto (se conserva el historial) |
+| `DELETE /socios/{ana}` | 409: tiene préstamos |
+
+### 25. Ids fuera de rango
+
+| Endpoint | Resultado esperado |
+|---|---|
+| `GET /socios/99999999999999999999` | 404 (antes de la Etapa 4 daba 500) |
+| `GET /libros?skip=99999999999999999999` | 422 |
+
+### 26. Lo que no se puede ver desde Swagger el mismo día
+
+Una **multa mayor a 0**, o un préstamo con `vencido: true` y `dias_atraso > 0`, requieren que pasen los 14 días del plazo, porque la fecha la decide el servidor. Esos casos se verificaron con pruebas que reemplazan la fecha de hoy (atrasos de −5 a 366 días) y se cubrirán con los tests de la Etapa 5.
+
+### 27. Calidad del código
+
+Igual que en el punto 6: `python -m pycodestyle .` no imprime nada y `python -m pyright` informa `0 errors`.
+
 ## Compatibilidad comprobada
 
 | Sistema | Versiones de Python | Qué se comprobó |
@@ -216,3 +284,6 @@ Igual que en el punto 6: `python -m pycodestyle .` no imprime nada y `python -m 
 | Linux | 3.10, 3.12 y 3.14 | Servidor real sobre una base creada con el código de la Etapa 2: asociar, duplicado, filtros y persistencia tras reiniciar. |
 | Windows (PowerShell) | 3.14 | Instalación en un entorno virtual limpio y arranque de la aplicación. |
 | Windows (PowerShell) | — | Recorrido completo de la Etapa 3 desde Swagger. |
+| Linux | 3.10, 3.12 y 3.14 | Los endpoints de préstamos con una batería de 173 comprobaciones (cada regla, el orden de las validaciones, multas de −5 a 366 días de atraso, pedidos simultáneos y pruebas de mutación), y también con las versiones más viejas que permiten los rangos de `requirements.txt`. |
+| Linux | 3.10 y 3.14 | Servidor real sobre una base creada con el código de la Etapa 3, lanzado desde otra carpeta y en una ruta con espacios y `Ñ`: datos viejos legibles, préstamos y devoluciones correctos y 25 + 30 + 20 pedidos HTTP simultáneos sin violar el stock ni el máximo. |
+| Windows (PowerShell) | 3.14 | Recorrido completo de la Etapa 4 desde Swagger. |
