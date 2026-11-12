@@ -9,12 +9,12 @@ API REST para gestionar el catálogo de una biblioteca (autores, libros y socios
 | 0 | Repositorio y entorno | Finalizada |
 | 1 | Modelos y base de datos | Finalizada |
 | 2 | CRUD de Autor, Libro y Socio | Finalizada |
-| 3 | Relaciones y consultas | Pendiente |
+| 3 | Relaciones y consultas | Finalizada |
 | 4 | Préstamos y reglas de negocio | Pendiente |
 | 5 | Tests y cobertura | Pendiente |
 | 6 | README final y entrega | Pendiente |
 
-Hoy la aplicación crea la base de datos con las cinco tablas y expone el CRUD completo de autores, libros y socios. Los endpoints de relaciones (Etapa 3) y de préstamos (Etapa 4) se agregan más adelante.
+Hoy la aplicación crea la base de datos con las cinco tablas, expone el CRUD completo de autores, libros y socios, permite asociar autores a los libros y filtrar los libros disponibles. Los endpoints de préstamos (Etapa 4) se agregan más adelante.
 
 ## Requisitos
 
@@ -60,10 +60,20 @@ Cada recurso ofrece alta (`POST`), listado (`GET`), consulta por id (`GET /{id}`
 | Recurso | Reglas destacadas |
 |---|---|
 | `/autores` | Nombre y nacionalidad obligatorios. No se puede borrar un autor con libros asociados (409). |
-| `/libros` | El ISBN es único (409) y se guarda sin guiones. Stock mayor o igual a 0 y año entre 1450 y el año actual. No se puede borrar un libro con préstamos (409). |
+| `/libros` | El ISBN es único (409) y se guarda sin guiones. Stock mayor o igual a 0 y año entre 1450 y el año actual. Toda respuesta incluye los autores del libro. El listado admite `?disponibles=true` (con stock) o `?disponibles=false` (agotados). No se puede borrar un libro con préstamos (409). |
 | `/socios` | El email es único sin distinguir mayúsculas (409) y se guarda en minúsculas. No se puede borrar un socio con préstamos (409). |
 
-Códigos de respuesta: **201** alta, **200** consulta y modificación, **204** baja, **404** el recurso no existe, **409** conflicto (duplicado o borrado no permitido) y **422** datos inválidos.
+### Relación entre libros y autores
+
+| Endpoint | Qué hace | Códigos |
+|---|---|---|
+| `POST /libros/{libro_id}/autores/{autor_id}` | Asocia un autor a un libro y devuelve el libro con todos sus autores | 201, 404 (libro o autor inexistente), 409 (ya estaban asociados) |
+| `DELETE /libros/{libro_id}/autores/{autor_id}` | Quita la asociación | 204, 404 (libro, autor o asociación inexistente) |
+| `GET /autores/{autor_id}/libros` | Lista paginada de los libros de un autor | 200, 404 |
+
+Los dos últimos no los pide la consigna: se agregaron para poder deshacer una asociación y para ver qué libros impiden borrar un autor.
+
+Códigos de respuesta: **201** alta, **200** consulta y modificación, **204** baja, **404** el recurso no existe, **409** conflicto (duplicado, asociación repetida o borrado no permitido) y **422** datos inválidos.
 
 **Para probar desde Swagger:** al cargar un socio, usar un email con un dominio real o de ejemplo (`ana@example.com`). Los dominios reservados como `.test`, `.local` o `localhost` se rechazan con 422.
 

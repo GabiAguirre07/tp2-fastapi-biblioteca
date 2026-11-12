@@ -140,9 +140,68 @@ Probar cada cuerpo y comprobar que la respuesta es 422 y que no se guarda nada:
 | `GET /socios/1` | 404 (ya no existe) |
 | `DELETE /socios/1` | 404 |
 
-Las bajas protegidas (409) son: un autor con libros asociados y un libro o socio con préstamos. **Todavía no se pueden provocar desde Swagger**, porque los libros se asocian a autores en la Etapa 3 y los préstamos se crean en la Etapa 4; se comprueban por Swagger al cerrar esas etapas. Mientras tanto se verificaron insertando los registros directamente en la base.
+Las bajas protegidas (409) son: un autor con libros asociados y un libro o socio con préstamos. La de autores se prueba desde la Etapa 3 (punto 18); la de libros y socios con préstamos **todavía no se puede provocar desde Swagger**, porque los préstamos se crean en la Etapa 4. Mientras tanto se verificó insertando los registros directamente en la base.
 
 ### 13. Calidad del código
+
+Igual que en el punto 6: `python -m pycodestyle .` no imprime nada y `python -m pyright` informa `0 errors`.
+
+## Etapa 3: relaciones y consultas
+
+Se prueba desde Swagger con la aplicación en marcha. Los ejemplos de esta sección suponen una base sin otros autores ni libros: si ya hay datos, se ven también los existentes y los `id` cambian (usar siempre los que devuelve cada alta). Para partir de una base limpia, detener la aplicación y borrar `biblioteca.db`.
+
+### 14. Preparar los datos
+
+| Endpoint | Cuerpo | Resultado esperado |
+|---|---|---|
+| `POST /autores` | `{"nombre": "Jorge Luis Borges", "nacionalidad": "Argentina"}` | 201 |
+| `POST /autores` | `{"nombre": "Adolfo Bioy Casares", "nacionalidad": "Argentina"}` | 201 |
+| `POST /libros` | `{"titulo": "El Aleph", "isbn": "9780307474728", "stock": 2, "anio": 1949}` | 201 con `"autores": []` |
+| `POST /libros` | `{"titulo": "Ficciones", "isbn": "9780802130303", "stock": 0, "anio": 1944}` | 201 con `"autores": []` |
+
+### 15. Asociar autores a un libro
+
+Con los `id` devueltos en el punto 14: `{libro}` es el de El Aleph y `{autor1}` y `{autor2}` los de Borges y Bioy Casares.
+
+| Endpoint | Resultado esperado |
+|---|---|
+| `POST /libros/{libro}/autores/{autor1}` | 201: el libro ya muestra a Borges en `autores` |
+| `POST /libros/{libro}/autores/{autor1}` (repetido) | 409: el autor ya está asociado |
+| `POST /libros/{libro}/autores/{autor2}` | 201: dos autores, ordenados por `id` |
+| `POST /libros/99/autores/{autor1}` | 404: el libro no existe |
+| `POST /libros/{libro}/autores/99` | 404: el autor no existe |
+| `GET /libros/{libro}` | 200 con los dos autores |
+
+### 16. Filtro por disponibilidad
+
+| Endpoint | Resultado esperado |
+|---|---|
+| `GET /libros?disponibles=true` | Solo los libros con stock (El Aleph) |
+| `GET /libros?disponibles=false` | Solo los agotados (Ficciones) |
+| `GET /libros` | Todos |
+| `GET /libros?disponibles=maybe` | 422 (valor que no es booleano) |
+| `GET /libros?disponibles=true&limit=1&skip=0` | El primer libro disponible |
+| `GET /libros?disponibles=true&limit=1&skip=1` | El segundo libro disponible; con un único disponible, lista vacía |
+
+El filtro se aplica antes de paginar: `skip` y `limit` cuentan sobre los libros ya filtrados. Con otros libros cargados, `skip=1` devuelve el segundo disponible y no una lista vacía.
+
+### 17. Libros de un autor
+
+| Endpoint | Resultado esperado |
+|---|---|
+| `GET /autores/{autor1}/libros` | 200 con El Aleph, mostrando **todos** sus autores |
+| `GET /autores/99/libros` | 404 |
+
+### 18. Desasociar y borrar un autor
+
+| Endpoint | Resultado esperado |
+|---|---|
+| `DELETE /autores/{autor1}` | 409: el autor tiene libros asociados |
+| `DELETE /libros/{libro}/autores/{autor1}` | 204 |
+| `DELETE /libros/{libro}/autores/{autor1}` (repetido) | 404: no está asociado |
+| `DELETE /autores/{autor1}` | 204: ya no tiene libros |
+
+### 19. Calidad del código
 
 Igual que en el punto 6: `python -m pycodestyle .` no imprime nada y `python -m pyright` informa `0 errors`.
 
@@ -153,4 +212,7 @@ Igual que en el punto 6: `python -m pycodestyle .` no imprime nada y `python -m 
 | Linux | 3.10, 3.11, 3.12, 3.13 y 3.14 | La aplicación arranca y crea las tablas con solo `requirements.txt`. |
 | Linux | 3.10, 3.11, 3.12, 3.13 y 3.14 | Los 15 endpoints de la Etapa 2 con una batería de unas 80 comprobaciones (códigos 200, 201, 204, 404, 409 y 422). |
 | Linux | 3.10, 3.12 y 3.14 | `pycodestyle` y `pyright` sin errores. |
+| Linux | 3.10, 3.11, 3.12, 3.13 y 3.14 | Los endpoints de relaciones y el filtro de la Etapa 3 con una batería de 74 comprobaciones, y también con las versiones más viejas que permiten los rangos de `requirements.txt`. |
+| Linux | 3.10, 3.12 y 3.14 | Servidor real sobre una base creada con el código de la Etapa 2: asociar, duplicado, filtros y persistencia tras reiniciar. |
 | Windows (PowerShell) | 3.14 | Instalación en un entorno virtual limpio y arranque de la aplicación. |
+| Windows (PowerShell) | — | Recorrido completo de la Etapa 3 desde Swagger. |

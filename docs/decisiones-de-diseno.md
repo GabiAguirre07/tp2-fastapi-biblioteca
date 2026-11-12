@@ -58,12 +58,33 @@ La consigna manda sobre cualquier otra referencia: se respeta su estructura de c
 
 26. **Modificación con `PATCH` parcial, sin `PUT`.** Se envían solo los campos a cambiar. Permite, por ejemplo, desactivar un socio con `{"activo": false}` sin reenviar todos sus datos. Un cuerpo vacío (`{}`) responde 200 sin cambios; enviar un campo con `null` responde 422, porque ninguna columna admite nulos y de otro modo la base lo rechazaría con un error 500. El `stock` se puede modificar directamente (nunca negativo), ya que representa los ejemplares disponibles.
 27. **Unicidad resuelta por la restricción de la base.** Se guarda y, si la base rechaza el duplicado, se responde 409. No se consulta antes si el ISBN o el email existen: entre la consulta y el guardado otro pedido podría insertar el mismo valor, mientras que la restricción `UNIQUE` es atómica. Tras el error se revierte la transacción para que la sesión siga siendo utilizable. Un `PATCH` que deja el ISBN o el email igual no entra en conflicto consigo mismo.
-28. **Borrado protegido.** Un libro o un socio con **cualquier** préstamo, incluso devuelto, no se puede borrar (409): se conserva el historial, y la base lo exige además por clave foránea. Para impedir que un socio pida más, se lo desactiva (`activo=false`). Un autor con libros asociados tampoco se puede borrar (409) para no modificar el catálogo sin aviso. Al borrar un libro sus vínculos con autores se eliminan junto con él, porque no tienen sentido sin el libro.
+28. **Borrado protegido.** Un libro o un socio con **cualquier** préstamo, incluso devuelto, no se puede borrar (409): se conserva el historial, y la base lo exige además por clave foránea. Para impedir que un socio pida más, se lo desactiva (`activo=false`). Un autor con libros asociados tampoco se puede borrar (409) para no modificar el catálogo sin aviso; para borrarlo hay que desasociar antes sus libros (decisión 35). Al borrar un libro sus vínculos con autores se eliminan junto con él, porque no tienen sentido sin el libro.
 29. **Autores homónimos permitidos.** El nombre del autor no es único: la consigna solo exige unicidad de ISBN y email, y dos autores distintos pueden llamarse igual.
-30. **Listado paginado.** `GET` de cada recurso admite `?skip=0&limit=100` (`limit` entre 1 y 100) y devuelve los registros ordenados por `id`; sin un orden fijo, la paginación podría repetir u omitir registros entre páginas. Los filtros propios (`disponibles`) se agregan en la Etapa 3.
+30. **Listado paginado.** `GET` de cada recurso admite `?skip=0&limit=100` (`limit` entre 1 y 100) y devuelve los registros ordenados por `id`; sin un orden fijo, la paginación podría repetir u omitir registros entre páginas. El filtro `disponibles` de `/libros` se sumó en la Etapa 3 (decisión 40).
 31. **Mensajes de error.** Los 404 y 409 llevan un mensaje en español (`{"detail": "..."}`). Los 422 los genera Pydantic y quedan en inglés: traducirlos requeriría código y dependencias que la consigna no pide.
 32. **Swagger documenta los códigos.** Cada operación declara sus respuestas posibles (201, 204, 404, 409), para que quien evalúa vea el contrato sin tener que adivinarlo.
 
 ### Limitación conocida
 
 33. **Emails con dominios reservados.** La librería `email-validator` rechaza (422) dominios como `.test`, `.local` y `localhost`; `example.com` y los dominios reales se aceptan. Se indica en el README para quien pruebe la API.
+
+## Etapa 3: relaciones y consultas
+
+### Asociación de autores a libros
+
+34. **Asociar un par ya asociado responde 409.** Es un conflicto con el estado de los datos, igual que un ISBN o un email repetido: quien llama sabe si hubo un cambio real. Lo detecta la clave primaria compuesta de `libroautor`, sin consultar antes si el vínculo existe, con el mismo mecanismo y por las mismas razones que la decisión 27 (no hay ventana en la que dos pedidos simultáneos dupliquen el vínculo). Comprobado con 20 pedidos simultáneos al mismo par: uno responde 201 y los otros 19, 409.
+35. **Dos endpoints que la consigna no pide.** `DELETE /libros/{libro_id}/autores/{autor_id}` quita una asociación; sin él, el mensaje del 409 al borrar un autor con libros («desasocie primero sus libros») pediría algo imposible. `GET /autores/{autor_id}/libros` muestra qué libros impiden el borrado. Desasociar un par que no está asociado responde 404, coherente con el 409 de asociar dos veces: quien llama siempre sabe si hubo cambio.
+36. **Los autores se asocian solo con el endpoint de la consigna.** El alta de libro no recibe autores (un campo `autores` enviado en el cuerpo se ignora): hay un único camino para asociar, con menos código y menos casos de error.
+37. **Asociar responde 201 con el libro completo.** Devuelve el libro con todos sus autores, así el resultado se ve sin otra consulta. Si el libro y el autor no existen, el 404 informa el libro, porque se verifica primero; cada caso tiene su propio mensaje.
+
+### Respuestas y consultas
+
+38. **Los autores viajan completos y en todas las respuestas de libro.** Alta, detalle, listado, modificación, asociación y libros de un autor usan el mismo esquema `LibroLeer`, que incluye `autores` como lista de `AutorLeer` (`id`, `nombre`, `nacionalidad`). Un solo esquema evita duplicar clases, y el campo es obligatorio para que Swagger lo documente como siempre presente. `AutorLeer` no incluye sus libros, para evitar referencias circulares.
+39. **Autores cargados junto con el libro y ordenados por `id`.** La relación usa `lazy="selectin"`: el listado hace 2 consultas fijas (libros y autores de todos ellos) en lugar de 1 + N. A cambio, cargar un libro sin necesitar sus autores (por ejemplo, desde un préstamo, Etapa 4) hace una consulta extra. El orden por `id` se declara de forma explícita porque SQL no lo garantiza; en SQLite el resultado ya sale así, por lo que ninguna prueba depende de ello.
+40. **Filtro `disponibles` con tres estados.** `?disponibles=true` lista los libros con stock mayor que 0, `false` los agotados (stock 0) y sin el parámetro, todos. Se aplica en la consulta SQL **antes** de `skip` y `limit`, así que la paginación cuenta sobre los libros ya filtrados y las páginas salen completas. Se aceptan `true`, `false`, `1` y `0` sin distinguir mayúsculas; cualquier otro valor da el 422 estándar de FastAPI.
+41. **`GET /autores/{autor_id}/libros` pagina en la base.** Se resuelve con un `JOIN` y no recorriendo `autor.libros`, para no cargar todos los libros del autor en memoria antes de recortar la página. Mismo formato (`LibroLeer`) y misma paginación que `/libros`; 404 si el autor no existe. Cada libro incluye **todos** sus autores, no solo el consultado.
+42. **Desasociar responde 204 sin cuerpo,** como el resto de las bajas.
+
+### Limitación conocida
+
+43. **Ventana mínima en la asociación.** Si otro cliente borra el autor o el libro justo entre la comprobación de que existen y la inserción del vínculo, el error de clave foránea se informaría como 409 («ya está asociado») en lugar de 404. No es alcanzable en el uso normal de la aplicación y no se trata.

@@ -54,6 +54,8 @@ erDiagram
 
 En el código, cada lado de la relación se navega con un atributo: `Autor.libros`, `Libro.autores`, `Libro.prestamos`, `Socio.prestamos`, `Prestamo.socio` y `Prestamo.libro`.
 
+`Libro.autores` se carga siempre junto con el libro (`lazy="selectin"`): SQLAlchemy hace una consulta para los libros y **una sola más** para los autores de todos ellos, en lugar de una consulta por libro (el problema N+1). Los autores de cada libro se ordenan por `id`.
+
 ## Tablas
 
 ### autor (`models/autores.py`)
@@ -78,7 +80,7 @@ En el código, cada lado de la relación se navega con un atributo: `Autor.libro
 
 | Campo | Tipo | Restricciones |
 |---|---|---|
-| `libro_id` | entero | Parte de la clave primaria. Clave foránea de `libro.id`. |
+| `libro_id` | entero | Parte de la clave primaria. Clave foránea de `libro.id`. La clave compuesta hace que asociar dos veces el mismo par responda 409. |
 | `autor_id` | entero | Parte de la clave primaria. Clave foránea de `autor.id`. |
 
 ### socio (`models/socios.py`)
@@ -126,6 +128,8 @@ Cada entidad tiene, además de su tabla, clases que definen lo que entra y lo qu
 | `...Crear` | Entrada del alta (`POST`): sin `id` | `AutorCrear` |
 | `...Actualizar` | Entrada del `PATCH`: todos los campos opcionales | `AutorActualizar` |
 | `...Leer` | Salida: los campos más el `id` | `AutorLeer` |
+
+`LibroLeer` suma además el campo `autores`, una lista de `AutorLeer` (`id`, `nombre` y `nacionalidad`), de modo que toda respuesta de libro incluye sus autores. `AutorLeer` no incluye los libros del autor (evita referencias circulares); se consultan con `GET /autores/{autor_id}/libros`.
 
 ### Reglas de validación de los campos
 
