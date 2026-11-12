@@ -11,12 +11,13 @@ from services.comunes import ID_MAXIMO
 
 
 class MensajeError(BaseModel):
-    """Cuerpo de las respuestas de error (403, 404, 409)."""
+    """Cuerpo de las respuestas de error (401, 403, 404, 409)."""
 
     detail: str
 
 
 # Se pasan en `responses=` para que Swagger documente cada código posible.
+RESPUESTA_401 = {401: {"model": MensajeError, "description": "No autenticado"}}
 RESPUESTA_403 = {403: {"model": MensajeError, "description": "No permitido"}}
 RESPUESTA_404 = {404: {"model": MensajeError, "description": "No existe"}}
 RESPUESTA_409 = {409: {"model": MensajeError, "description": "Conflicto"}}

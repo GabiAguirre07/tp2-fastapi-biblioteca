@@ -163,3 +163,38 @@ La suite tiene **272 tests** y una cobertura de **99,80 %**. Además de la cober
 
 81. **Los tests de concurrencia dependen de SQLite** (bloqueo de escritura de toda la base, decisión 61). En otro motor harían falta otras garantías y otros tests.
 82. **El porcentaje no mide la calidad por sí solo.** Un 99,8 % indica qué líneas se ejecutan, no que cada una se compruebe: por eso se sumó la prueba con modificaciones deliberadas descrita arriba.
+
+## Etapa 7: roles (bibliotecario y socio)
+
+Nota de numeración: las decisiones 83 a 88 (cierre de la Etapa 6) se incorporan a este archivo en el cierre final de la entrega; la Etapa 7 sigue desde la 89.
+
+### Confirmadas por Gabriel
+
+89. **Identificación por encabezados simulados.** `X-Rol` (`bibliotecario` o `socio`) y `X-Socio-Id` (solo para el socio) se declaran como esquemas de seguridad (`APIKeyHeader`), de modo que Swagger los muestra en el botón *Authorize* y los envía solos en cada llamada. No agrega dependencias ni cambia las tablas: el `biblioteca.db` existente sigue siendo válido. Separa dos conceptos: la **autenticación** (¿quién sos?) es simulada y la **autorización** (¿qué podés hacer?) es real.
+90. **Matriz «socio solo lectura».** El bibliotecario puede todo. El socio consulta el catálogo (`GET` de autores y libros) y ve únicamente sus propios préstamos; no administra socios ni catálogo, y no pide ni devuelve préstamos.
+91. **Sin credenciales: 401 en todo menos el catálogo.** Los `GET` de autores y libros y la documentación (`/docs`, `/openapi.json`) son públicos; nada queda abierto «por defecto» al rol de administrador.
+92. **La etapa se trabajó en la rama `etapa-7-roles`**, para mantener `main` entregable hasta cerrarla.
+
+### Detalles de la implementación
+
+93. **`APIKeyHeader` con `auto_error=False`** en lugar de parámetros `Header()` comunes: aparecen en *Authorize* y el error de «falta el encabezado» lo decide el servicio, con el mismo formato `{"detail": ...}` que el resto de los errores.
+94. **401 = no se sabe quién pide; 403 = se sabe, pero no le corresponde.** Falta o es inválido el rol, o el socio indicado no existe → 401 (`NoAutenticado`). Rol insuficiente o recurso ajeno → 403 (`OperacionNoPermitida`, ya existente).
+95. **El rol no distingue mayúsculas ni espacios en los bordes** (`" Bibliotecario "` vale). Un bibliotecario ignora `X-Socio-Id`, incluso con un valor inválido.
+96. **Un socio debe existir pero puede estar inactivo.** La regla 3 impide que un socio inactivo *reciba* préstamos nuevos, no que consulte los que ya tiene.
+97. **Pedir datos de otro socio responde 403 y no 404**, para no revelar qué ids existen. El bibliotecario sí recibe 404 si el socio no existe.
+98. **El socio no ve el listado ni la ficha de socios** (`GET /socios`, `GET /socios/{id}`): solo catálogo y sus préstamos.
+99. **La autorización vive en `services/seguridad.py` y en dependencias de los routers; los servicios de negocio no reciben el usuario.** Las 8 reglas de negocio no saben que existen los roles. Por inversión de dependencias, reemplazar la identificación simulada por JWT solo exigiría cambiar `identificar_usuario` y `obtener_usuario`.
+100. **Cada endpoint declara su política en el decorador** con `dependencies=[SOLO_BIBLIOTECARIO]` o `dependencies=[EL_PROPIO_SOCIO_O_BIBLIOTECARIO]`. La dependencia se ejecuta antes de validar el cuerpo: sin credenciales siempre responde 401 (y a un socio, 403) aunque el JSON esté mal. `GET /prestamos/{id}` carga el préstamo y recién entonces comprueba de quién es.
+101. **El id de socio se valida con `isascii()` y `isdigit()` y un tope de cifras antes de `int()`.** Sin eso, un encabezado de miles de dígitos daría un error interno (500) en Python 3.10.7 o posterior, y `isdigit()` solo aceptaría caracteres como «²».
+102. **El cliente de los tests se identifica como bibliotecario** (`conftest.py`) y existe la fixture `anonimo`: por eso los 272 tests anteriores pasan sin modificarse.
+103. **Los mensajes de 401 y 403 están en español**, como los 404 y 409. El 401 por socio inexistente dice «El socio N no existe»: aceptable para una identificación simulada.
+
+### Limitaciones conocidas
+
+104. **La autenticación es simulada:** el servidor cree lo que el cliente declara; cualquiera puede escribir `X-Rol: bibliotecario`. Es una decisión consciente para que se puedan probar los permisos en un clic; no hay contraseñas ni tokens.
+105. **Las respuestas 401 no incluyen el encabezado `WWW-Authenticate`**, que el estándar HTTP pide; ni Swagger ni `curl` lo necesitan. Es un desvío conocido.
+106. **Quien prueba la API tiene un paso más:** pulsar *Authorize* y escribir `bibliotecario` antes de usar altas, préstamos y devoluciones. Los `GET` del catálogo siguen sin pasos.
+
+### Resultado y verificación
+
+La suite pasa a **339 tests** (272 anteriores sin modificar y 67 nuevos en `tests/test_seguridad.py`) con una cobertura de **99,82 %**. Se comprobó que los tests detectan errores reales: 12 modificaciones deliberadas de la autorización (quitar la exigencia de bibliotecario, quitar la comprobación de propietario, invertir reglas, aceptar dígitos no ASCII, etc.) fueron detectadas, y un recorrido de 50 llamadas `curl` contra la app real dio los códigos esperados sin errores 500.

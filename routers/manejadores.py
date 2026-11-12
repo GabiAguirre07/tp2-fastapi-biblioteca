@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from services.excepciones import (
     ConflictoDeNegocio,
     ErrorDeNegocio,
+    NoAutenticado,
     OperacionNoPermitida,
     RecursoNoEncontrado,
 )
@@ -16,6 +17,7 @@ CODIGOS_HTTP: dict[type[ErrorDeNegocio], int] = {
     RecursoNoEncontrado: status.HTTP_404_NOT_FOUND,
     ConflictoDeNegocio: status.HTTP_409_CONFLICT,
     OperacionNoPermitida: status.HTTP_403_FORBIDDEN,
+    NoAutenticado: status.HTTP_401_UNAUTHORIZED,
 }
 
 

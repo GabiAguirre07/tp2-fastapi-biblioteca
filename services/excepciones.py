@@ -23,3 +23,7 @@ class ConflictoDeNegocio(ErrorDeNegocio):
 
 class OperacionNoPermitida(ErrorDeNegocio):
     """Quien pide la operación no está habilitado para hacerla (403)."""
+
+
+class NoAutenticado(ErrorDeNegocio):
+    """Faltan las credenciales o son inválidas (se traduce a 401)."""

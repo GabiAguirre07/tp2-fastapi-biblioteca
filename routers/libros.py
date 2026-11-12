@@ -1,4 +1,8 @@
-"""Endpoints de libros: alta, consulta, listado, modificación y baja."""
+"""Endpoints de libros: alta, consulta, listado, modificación y baja.
+
+La consulta y el listado son públicos; el alta, la modificación, la baja y
+la asociación con autores son solo del bibliotecario.
+"""
 
 from collections.abc import Sequence
 from typing import Annotated
@@ -7,7 +11,14 @@ from fastapi import APIRouter, Query, status
 
 from database import SesionDep
 from models import Libro, LibroActualizar, LibroCrear, LibroLeer
-from routers.comunes import PaginacionDep, RESPUESTA_404, RESPUESTA_409
+from routers.comunes import (
+    PaginacionDep,
+    RESPUESTA_401,
+    RESPUESTA_403,
+    RESPUESTA_404,
+    RESPUESTA_409,
+)
+from routers.seguridad import SOLO_BIBLIOTECARIO
 from services import libros as servicio
 
 router = APIRouter(prefix="/libros", tags=["Libros"])
@@ -18,7 +29,8 @@ router = APIRouter(prefix="/libros", tags=["Libros"])
     response_model=LibroLeer,
     status_code=status.HTTP_201_CREATED,
     summary="Alta de libro",
-    responses={**RESPUESTA_409},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_409},
 )
 def crear_libro(datos: LibroCrear, sesion: SesionDep) -> Libro:
     """Crea un libro y devuelve el registro con su id."""
@@ -58,7 +70,8 @@ def obtener_libro(libro_id: int, sesion: SesionDep) -> Libro:
     "/{libro_id}",
     response_model=LibroLeer,
     summary="Modificación parcial de libro",
-    responses={**RESPUESTA_404, **RESPUESTA_409},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_404, **RESPUESTA_409},
 )
 def actualizar_libro(
     libro_id: int, cambios: LibroActualizar, sesion: SesionDep
@@ -71,7 +84,8 @@ def actualizar_libro(
     "/{libro_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Baja de libro",
-    responses={**RESPUESTA_404, **RESPUESTA_409},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_404, **RESPUESTA_409},
 )
 def eliminar_libro(libro_id: int, sesion: SesionDep) -> None:
     """Elimina el libro con ese id."""
@@ -83,7 +97,8 @@ def eliminar_libro(libro_id: int, sesion: SesionDep) -> None:
     response_model=LibroLeer,
     status_code=status.HTTP_201_CREATED,
     summary="Asociar un autor a un libro",
-    responses={**RESPUESTA_404, **RESPUESTA_409},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_404, **RESPUESTA_409},
 )
 def asociar_autor(libro_id: int, autor_id: int, sesion: SesionDep) -> Libro:
     """Asocia el autor al libro y devuelve el libro con todos sus autores."""
@@ -94,7 +109,8 @@ def asociar_autor(libro_id: int, autor_id: int, sesion: SesionDep) -> Libro:
     "/{libro_id}/autores/{autor_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Desasociar un autor de un libro",
-    responses={**RESPUESTA_404},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_404},
 )
 def desasociar_autor(libro_id: int, autor_id: int, sesion: SesionDep) -> None:
     """Quita la asociación entre el libro y el autor."""

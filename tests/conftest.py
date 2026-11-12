@@ -61,6 +61,11 @@ def cliente(tablas: None, motor: Engine, reloj: Reloj) -> Iterator[TestClient]:
     Se reemplazan dos dependencias de la app con dependency_overrides: la
     sesión de base de datos y la fecha de hoy. Al terminar se limpian para
     que no afecten al test siguiente.
+
+    El cliente se identifica como bibliotecario en cada pedido (encabezado
+    X-Rol), de modo que los tests de las reglas de negocio y del CRUD
+    trabajan con permisos completos. Un test que necesite otro rol, o
+    ninguno, envía sus propios encabezados o usa el cliente «anonimo».
     """
 
     def sesion_de_prueba() -> Iterator[Session]:
@@ -69,8 +74,14 @@ def cliente(tablas: None, motor: Engine, reloj: Reloj) -> Iterator[TestClient]:
 
     app.dependency_overrides[obtener_sesion] = sesion_de_prueba
     app.dependency_overrides[obtener_fecha_hoy] = reloj
-    yield TestClient(app)
+    yield TestClient(app, headers={"X-Rol": "bibliotecario"})
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def anonimo(cliente: TestClient) -> TestClient:
+    """Cliente sin credenciales, sobre la misma app y la misma base que «cliente»."""
+    return TestClient(app)
 
 
 @pytest.fixture

@@ -314,6 +314,65 @@ Los tests reemplazan la fecha de «hoy» (`dependency_overrides[obtener_fecha_ho
 
 `python -m pycodestyle .` no imprime nada y `python -m pyright` informa `0 errors`; ambos revisan también la carpeta `tests/`.
 
+## Etapa 7: roles
+
+Los endpoints de escritura y de préstamos exigen identificarse. El catálogo (`GET` de autores y libros) y `/docs` son públicos. La identificación es simulada con dos encabezados (decisión 89).
+
+### 33. Ejecutar los tests
+
+```bash
+python -m pytest --cov
+```
+
+**Resultado esperado:** `339 passed` (272 anteriores y 67 de `tests/test_seguridad.py`) y cobertura de **99 %** (99,82 %). Además, `python -m pycodestyle .` no imprime nada y `python -m pyright` informa `0 errors`.
+
+### 34. Identificarse en Swagger
+
+Arrancar la aplicación, abrir <http://127.0.0.1:8000/docs> y pulsar **Authorize**. Hay dos campos: `Rol` y `SocioId`. Para administrar, escribir `bibliotecario` en `Rol` y dejar `SocioId` vacío. Los endpoints protegidos muestran un candado.
+
+### 35. Recorrido como bibliotecario
+
+Con `Rol` = `bibliotecario`, ejecutar en este orden (base vacía; para partir de cero, borrar `biblioteca.db` con la app detenida):
+
+| # | Llamada | Cuerpo | Debe responder |
+|---|---|---|---|
+| 1 | `POST /autores` | `{"nombre":"Jorge Luis Borges","nacionalidad":"Argentina"}` | 201 |
+| 2 | `POST /libros` | `{"titulo":"El Aleph","isbn":"9788499089515","stock":3,"anio":1949}` | 201 |
+| 3 | `POST /socios` | `{"nombre":"Ana Perez","email":"ana@example.com"}` | 201 |
+| 4 | `POST /socios` | `{"nombre":"Beto Gomez","email":"beto@example.com"}` | 201 |
+| 5 | `POST /prestamos` | `{"socio_id":1,"libro_id":1}` | 201 (préstamo 1, de Ana) |
+| 6 | `POST /prestamos` | `{"socio_id":2,"libro_id":1}` | 201 (préstamo 2, de Beto) |
+
+### 36. Recorrido como socio
+
+En *Authorize*, cerrar sesión de `Rol` y volver a entrar con `Rol` = `socio` y `SocioId` = `1` (Ana):
+
+| # | Llamada | Debe responder |
+|---|---|---|
+| 7 | `GET /libros` | 200 |
+| 8 | `GET /socios/1/prestamos` | 200, un préstamo (el de Ana) |
+| 9 | `GET /prestamos/1` | 200 |
+| 10 | `GET /socios/2/prestamos` | 403, «Un socio solo puede ver sus propios préstamos» |
+| 11 | `GET /prestamos/2` | 403 (es de Beto) |
+| 12 | `GET /socios` | 403, «Esta operación es solo para el bibliotecario» |
+| 13 | `POST /prestamos` con `{"socio_id":1,"libro_id":1}` | 403 |
+| 14 | `POST /autores` con cualquier cuerpo válido | 403 |
+
+### 37. Sin credenciales o con credenciales inválidas
+
+Cerrar sesión de ambos campos: `GET /libros` responde 200 (público) y `GET /socios` responde 401, «Falta el encabezado X-Rol». Con `Rol` = `admin`, `GET /socios` responde 401, «El rol 'admin' no es válido». Con `Rol` = `socio` y `SocioId` = `99`, 401, «El socio 99 no existe».
+
+### 38. Lo mismo con `curl`
+
+```bash
+curl -i http://127.0.0.1:8000/socios                                   # 401
+curl -i -H "X-Rol: bibliotecario" http://127.0.0.1:8000/socios          # 200
+curl -i -H "X-Rol: socio" -H "X-Socio-Id: 1" http://127.0.0.1:8000/socios/1/prestamos   # 200
+curl -i -H "X-Rol: socio" -H "X-Socio-Id: 1" http://127.0.0.1:8000/socios/2/prestamos   # 403
+```
+
+**Limitación:** los encabezados no se validan con contraseña; cualquiera puede declararse bibliotecario (decisión 104).
+
 ## Compatibilidad comprobada
 
 | Sistema | Versiones de Python | Qué se comprobó |
@@ -332,3 +391,6 @@ Los tests reemplazan la fecha de «hoy» (`dependency_overrides[obtener_fecha_ho
 | Linux | 3.10 y 3.14 | Los tests con las versiones más viejas que permiten los rangos de `requirements-dev.txt`. |
 | Linux | 3.10, 3.12 y 3.14 | Cada archivo de tests por separado y en orden inverso; la concurrencia, 40 veces seguidas; y 22 modificaciones deliberadas del código, todas detectadas por los tests. |
 | Windows (PowerShell) | 3.14 | Suite ejecutada con `python -m pytest --cov` en el entorno virtual del proyecto. |
+| Linux | 3.10, 3.11, 3.12, 3.13 y 3.14 | Etapa 7: los 339 tests (`339 passed`) con cobertura de 99,82 %; `pycodestyle` y `pyright` sin errores. |
+| Linux | 3.10 a 3.14 | Etapa 7: recorrido de 50 llamadas `curl` sobre la app real (reglas como bibliotecario y permisos de cada rol), sin errores 500, y 12 modificaciones deliberadas de la autorización detectadas por los tests. |
+| Windows (PowerShell) | 3.14 | Etapa 7: suite ejecutada con `python -m pytest --cov` y recorrido de *Authorize* desde Swagger. |

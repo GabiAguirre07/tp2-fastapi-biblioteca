@@ -1,4 +1,8 @@
-"""Endpoints de socios: alta, consulta, listado, modificación y baja."""
+"""Endpoints de socios: alta, consulta, listado, modificación y baja.
+
+La administración de socios es solo del bibliotecario. La única excepción es
+el listado de préstamos de un socio: lo ve el bibliotecario o el propio socio.
+"""
 
 from collections.abc import Sequence
 from typing import Annotated
@@ -10,9 +14,12 @@ from models import PrestamoLeer, Socio, SocioActualizar, SocioCrear, SocioLeer
 from routers.comunes import (
     FechaHoyDep,
     PaginacionDep,
+    RESPUESTA_401,
+    RESPUESTA_403,
     RESPUESTA_404,
     RESPUESTA_409,
 )
+from routers.seguridad import SOLO_BIBLIOTECARIO, EL_PROPIO_SOCIO_O_BIBLIOTECARIO
 from services import prestamos as servicio_prestamos
 from services import socios as servicio
 
@@ -24,14 +31,21 @@ router = APIRouter(prefix="/socios", tags=["Socios"])
     response_model=SocioLeer,
     status_code=status.HTTP_201_CREATED,
     summary="Alta de socio",
-    responses={**RESPUESTA_409},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_409},
 )
 def crear_socio(datos: SocioCrear, sesion: SesionDep) -> Socio:
     """Crea un socio y devuelve el registro con su id."""
     return servicio.crear_socio(sesion, datos)
 
 
-@router.get("", response_model=list[SocioLeer], summary="Listado de socios")
+@router.get(
+    "",
+    response_model=list[SocioLeer],
+    summary="Listado de socios",
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403},
+)
 def listar_socios(sesion: SesionDep, pagina: PaginacionDep) -> Sequence[Socio]:
     """Devuelve los socios ordenados por id, con paginación."""
     return servicio.listar_socios(sesion, pagina.skip, pagina.limit)
@@ -41,7 +55,8 @@ def listar_socios(sesion: SesionDep, pagina: PaginacionDep) -> Sequence[Socio]:
     "/{socio_id}",
     response_model=SocioLeer,
     summary="Consulta de socio por id",
-    responses={**RESPUESTA_404},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_404},
 )
 def obtener_socio(socio_id: int, sesion: SesionDep) -> Socio:
     """Devuelve el socio con ese id."""
@@ -52,7 +67,8 @@ def obtener_socio(socio_id: int, sesion: SesionDep) -> Socio:
     "/{socio_id}",
     response_model=SocioLeer,
     summary="Modificación parcial de socio",
-    responses={**RESPUESTA_404, **RESPUESTA_409},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_404, **RESPUESTA_409},
 )
 def actualizar_socio(
     socio_id: int, cambios: SocioActualizar, sesion: SesionDep
@@ -65,7 +81,8 @@ def actualizar_socio(
     "/{socio_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Baja de socio",
-    responses={**RESPUESTA_404, **RESPUESTA_409},
+    dependencies=[SOLO_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_404, **RESPUESTA_409},
 )
 def eliminar_socio(socio_id: int, sesion: SesionDep) -> None:
     """Elimina el socio con ese id."""
@@ -76,7 +93,8 @@ def eliminar_socio(socio_id: int, sesion: SesionDep) -> None:
     "/{socio_id}/prestamos",
     response_model=list[PrestamoLeer],
     summary="Préstamos de un socio",
-    responses={**RESPUESTA_404},
+    dependencies=[EL_PROPIO_SOCIO_O_BIBLIOTECARIO],
+    responses={**RESPUESTA_401, **RESPUESTA_403, **RESPUESTA_404},
 )
 def listar_prestamos_de_socio(
     socio_id: int,
