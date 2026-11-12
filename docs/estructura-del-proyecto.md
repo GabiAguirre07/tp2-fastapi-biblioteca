@@ -1,6 +1,6 @@
 # Estructura del proyecto
 
-## Estado actual (Etapa 4)
+## Estado actual (Etapa 5)
 
 ```text
 tp2-fastapi-biblioteca/
@@ -30,17 +30,30 @@ tp2-fastapi-biblioteca/
 │   ├── libros.py           /libros y /libros/{id}/autores/{autor_id}
 │   ├── prestamos.py        /prestamos
 │   └── socios.py           /socios y /socios/{id}/prestamos
+├── tests/                  Tests automáticos (pytest)
+│   ├── __init__.py
+│   ├── conftest.py         Fixtures: base en memoria, reloj, cliente HTTP y ayudante de API
+│   ├── ayudas.py           Reloj (fecha de «hoy» controlable) y Api (crea datos por la API)
+│   ├── test_reglas_de_negocio.py   Caso feliz y de error de cada regla de la consigna
+│   ├── test_autores.py     CRUD y validaciones de autores
+│   ├── test_libros.py      CRUD, ISBN, filtro, paginación y asociación con autores
+│   ├── test_socios.py      CRUD y validaciones de socios
+│   ├── test_prestamos.py   Préstamos, devoluciones, multas y listados
+│   ├── test_servicios.py   Funciones de services/ probadas directamente
+│   ├── test_modelos.py     Restricciones de las tablas contra la base
+│   ├── test_aplicacion.py  Arranque, lifespan, Swagger y manejo de errores
+│   └── test_concurrencia.py  Pedidos simultáneos con hilos sobre una base en archivo
 ├── docs/                   Documentación del proyecto
 ├── requirements.txt        Dependencias para ejecutar la aplicación
-├── requirements-dev.txt    Dependencias de desarrollo (incluye las anteriores)
-├── setup.cfg               Configuración de pycodestyle
+├── requirements-dev.txt    Dependencias de desarrollo y tests (incluye las anteriores)
+├── setup.cfg               Configuración de pycodestyle, pytest y cobertura
 ├── .gitignore              Archivos que Git no versiona
 └── README.md               Cómo instalar, ejecutar y verificar
 ```
 
 Al ejecutar la aplicación se crea además `biblioteca.db` (la base SQLite). No se versiona.
 
-La carpeta `tests/` que pide la consigna se agrega en la Etapa 5.
+Al correr los tests se generan `.coverage` y `.pytest_cache/`, que tampoco se versionan.
 
 ## Responsabilidad de cada archivo
 
@@ -59,6 +72,9 @@ La carpeta `tests/` que pide la consigna se agrega en la Etapa 5.
 | `services/comunes.py` | Operaciones compartidas por todas las entidades: `obtener_o_404` (también trata como inexistente un id fuera del rango de SQLite), `guardar` (convierte el `IntegrityError` en conflicto), `eliminar` y `transaccion`, que agrupa varios cambios para que se confirmen todos juntos o ninguno. |
 | `services/autores.py`, `libros.py`, `socios.py` | Alta, listado, consulta, modificación y baja de cada entidad, con sus reglas (por ejemplo, no borrar un autor con libros). Además, `libros.py` filtra por disponibilidad y asocia y desasocia autores, y `autores.py` lista los libros de un autor. |
 | `services/prestamos.py` | Las reglas de la Etapa 4: `crear_prestamo` (404, 403, límite de 3 y stock, con vencimiento a 14 días), `devolver_prestamo` (repone el stock y calcula la multa), `obtener_prestamo`, `listar_prestamos_de_socio` y `a_lectura`, que agrega los datos calculados `vencido` y `dias_atraso`. Las cifras de la consigna son constantes al inicio del archivo. |
+| `tests/conftest.py` | Las fixtures compartidas: `motor` (automática: reemplaza `database.engine` por una base SQLite en memoria para cada test), `tablas`, `reloj`, `cliente` (`TestClient` con la sesión y la fecha reemplazadas mediante `dependency_overrides`) y `api`. |
+| `tests/ayudas.py` | `Reloj`, que entrega la fecha de «hoy» y permite avanzarla (`avanzar(dias)`), y `Api`, un ayudante que crea autores, libros, socios y préstamos a través de la propia API con valores únicos. |
+| `tests/test_*.py` | Un archivo por entidad, uno con las reglas de negocio de la consigna y cuatro transversales (servicios, modelos, aplicación y concurrencia). |
 | `routers/comunes.py` | `Paginacion` / `PaginacionDep` (`skip` y `limit`), las respuestas 403, 404 y 409 que se documentan en Swagger y `FechaHoyDep`, la dependencia que entrega la fecha de hoy (los tests la reemplazan por una fecha fija). |
 | `routers/manejadores.py` | Traduce cada error de negocio a su código HTTP mediante el diccionario `CODIGOS_HTTP`. |
 | `routers/autores.py`, `libros.py`, `socios.py` | Cinco endpoints por recurso, más los de relación (`POST` y `DELETE /libros/{id}/autores/{autor_id}`, `GET /autores/{id}/libros`) y `GET /socios/{id}/prestamos`. Solo reciben el pedido, llaman al servicio y devuelven el esquema de salida. |

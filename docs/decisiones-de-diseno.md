@@ -129,3 +129,37 @@ Al probar los ids límite se vio que, desde la Etapa 2, `GET /socios/99999999999
 61. **La garantía de concurrencia es la de SQLite.** El bloqueo de escritura de SQLite es de toda la base y es lo que protege el máximo de 3 incluso entre libros distintos. En otro motor (por ejemplo PostgreSQL) el `UPDATE` solo bloquearía la fila del libro y habría que bloquear además la fila del socio.
 62. **Ventana mínima con el estado del socio.** El campo `activo` se lee antes de empezar la transacción: si otro cliente desactiva al socio en ese instante exacto, ese préstamo se concedería. No afecta al stock ni al máximo de 3, no es alcanzable en el uso normal y no se trata.
 63. **«Hoy» es la fecha local del servidor** (`date.today()`): lo esperable para quien lo ejecuta en su computadora; en un servidor de otra zona horaria el día cambia a la medianoche de esa zona.
+
+## Etapa 5: tests y cobertura
+
+### Herramientas y organización
+
+64. **`httpx2` en `requirements-dev.txt`.** El `TestClient` de FastAPI/Starlette lo exige. Es una dependencia solo de desarrollo: `requirements.txt` no cambia y quien únicamente ejecute la API no instala nada nuevo. Se consultó antes de sumarla.
+65. **Versiones con piso y tope**, igual que en `requirements.txt`: `pytest>=8.0,<10.0`, `pytest-cov>=5.0,<8.0` y `httpx2>=2.1,<3.0`. En Python 3.10 pip instala `httpx2` 2.14.0 (la 2.15 en adelante exige 3.11) y los tests funcionan igual.
+66. **Un archivo de tests por entidad más uno de reglas de negocio.** `test_reglas_de_negocio.py` contiene, para cada regla de la consigna, un test de caso feliz y uno de error con el número de la regla en el nombre, de modo que quien corrige encuentra todo en un solo lugar. Los archivos por entidad cubren el CRUD, las validaciones y las relaciones. Hay además archivos transversales: servicios, modelos, aplicación y concurrencia.
+67. **La base de los tests se reemplaza con una fixture automática.** `motor` sustituye `database.engine` por una base SQLite en memoria (`StaticPool` y `check_same_thread=False`, para que todas las conexiones vean la misma base) antes de cada test. Así ni los tests ni el `lifespan` de la aplicación pueden abrir `biblioteca.db`. Cada test arranca con tablas vacías.
+68. **La fecha de «hoy» es una fixture modificable.** `reloj` se instala con `app.dependency_overrides[obtener_fecha_hoy]` (la dependencia de la decisión 56) y permite avanzar días en medio de un test, por ejemplo para devolver un libro con atraso y comprobar la multa.
+69. **Alcance completo con casos borde.** Además de los casos felices y de error: validaciones 422, ids imposibles (`0`, `-1`, `2**63` y `10**30`, regresión de la corrección de la Etapa 4), paginación, el orden de las validaciones al prestar, efectos colaterales sobre el stock y multas desde −5 hasta 366 días de atraso.
+70. **Pocos tests de concurrencia, con hilos y un archivo temporal.** Con una única conexión en memoria no existen carreras reales, así que estos tests usan una base en archivo dentro de `tmp_path`: 12 hilos sincronizados con una `Barrier` piden a la vez el último ejemplar, superar el máximo de 3 préstamos y devolver dos veces el mismo préstamo. Comprueban lo que garantizan las decisiones 52 y 54.
+71. **Cada error se afirma con el código HTTP y un fragmento clave del mensaje.** El código es el contrato; el fragmento (por ejemplo «sin stock») evita que dos errores distintos con el mismo código pasen por el mismo test sin que nadie lo note, sin atar el test al texto completo.
+
+### Detalles de la implementación
+
+72. **`tests/` es un paquete** (tiene `__init__.py`): pytest agrega la raíz del repositorio a `sys.path` y los tests importan `main`, `models` o `services` sin configurar nada más.
+73. **Casi todo se prueba a través de la API.** Es lo que usa quien evalúa y lo que ejercita las capas juntas. Los servicios se prueban directamente solo donde la API no alcanza (funciones puras, `transaccion`, `obtener_o_404`, `guardar`) y los modelos contra la base.
+74. **`Api` crea los datos por la propia API** (con valores únicos y comprobando el 201 de cada alta), de modo que los tests no repiten el armado de datos y fallan con un mensaje claro si la preparación no funciona.
+75. **La cobertura se mide solo sobre el código de la aplicación** (`main`, `database`, `models`, `routers` y `services`, en `[coverage:run] source`), no sobre los propios tests, que inflarían el porcentaje.
+76. **`fail_under = 80` en `setup.cfg`.** El umbral de la consigna queda como regla ejecutable: si la cobertura baja de 80 %, `pytest --cov` termina con error.
+77. **La regla 4 (vencimiento a 14 días) tiene un solo test** porque no tiene un caso de error; la regla 5 (devolución y multa) tiene dos casos felices, a tiempo y con atraso.
+78. **Un test comprueba que `biblioteca.db` no se crea ni se modifica** durante la corrida, para que la garantía de la decisión 67 no dependa de la memoria de nadie.
+79. **Una sola línea sin cubrir a propósito:** `routers/manejadores.py`, línea 25 (`raise error`). Es una defensa que ningún pedido real puede alcanzar; cubrirla exigiría fabricar una situación artificial.
+80. **Nombres descriptivos y estructura preparar → actuar → comprobar** en cada test, para que el nombre diga qué regla se prueba y qué se espera.
+
+### Resultado y verificación
+
+La suite tiene **272 tests** y una cobertura de **99,80 %**. Además de la cobertura, se comprobó que los tests detectan errores reales: se introdujeron 22 modificaciones deliberadas en el código (por ejemplo quitar el `rollback` de `transaccion`, cambiar la multa a $50 o el plazo a 15 días, o cambiar `> 0` por `>= 0` en el filtro de disponibles) y los tests fallaron en las 22. Cada archivo de tests también pasa solo y en orden inverso, y la concurrencia se repitió 40 veces sin fallas.
+
+### Limitaciones conocidas
+
+81. **Los tests de concurrencia dependen de SQLite** (bloqueo de escritura de toda la base, decisión 61). En otro motor harían falta otras garantías y otros tests.
+82. **El porcentaje no mide la calidad por sí solo.** Un 99,8 % indica qué líneas se ejecutan, no que cada una se compruebe: por eso se sumó la prueba con modificaciones deliberadas descrita arriba.

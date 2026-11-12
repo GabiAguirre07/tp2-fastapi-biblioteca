@@ -267,11 +267,52 @@ Se prueba desde Swagger con la aplicación en marcha. Los `id` dependen de lo qu
 
 ### 26. Lo que no se puede ver desde Swagger el mismo día
 
-Una **multa mayor a 0**, o un préstamo con `vencido: true` y `dias_atraso > 0`, requieren que pasen los 14 días del plazo, porque la fecha la decide el servidor. Esos casos se verificaron con pruebas que reemplazan la fecha de hoy (atrasos de −5 a 366 días) y se cubrirán con los tests de la Etapa 5.
+Una **multa mayor a 0**, o un préstamo con `vencido: true` y `dias_atraso > 0`, requieren que pasen los 14 días del plazo, porque la fecha la decide el servidor. Esos casos se verifican con los tests de la Etapa 5, que reemplazan la fecha de hoy (atrasos de −5 a 366 días): ver el punto 31.
 
 ### 27. Calidad del código
 
 Igual que en el punto 6: `python -m pycodestyle .` no imprime nada y `python -m pyright` informa `0 errors`.
+
+## Etapa 5: tests y cobertura
+
+### 28. Instalar y ejecutar los tests
+
+Con el entorno virtual activado:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest --cov
+```
+
+**Resultado esperado:** al final, `272 passed`, una tabla de cobertura por archivo con un total de **99 %** (99,80 %) y la línea `Required test coverage of 80.0% reached`. La única línea sin cubrir es `routers/manejadores.py:25`, a propósito (ver la decisión 79). Dura unos 15 segundos.
+
+### 29. Los tests no tocan la base real
+
+Borrar `biblioteca.db` (si existe), ejecutar `python -m pytest -q` y comprobar que el archivo **no** reaparece. Los tests usan una base SQLite en memoria; además hay un test que lo comprueba.
+
+### 30. Qué cubre cada archivo
+
+| Archivo | Tests | Qué comprueba |
+|---|---|---|
+| `test_reglas_de_negocio.py` | 16 | Caso feliz y de error de cada regla de la consigna |
+| `test_autores.py` | 39 | CRUD, validaciones y borrado protegido |
+| `test_libros.py` | 72 | CRUD, ISBN, stock, año, filtro `disponibles`, paginación y asociación con autores |
+| `test_socios.py` | 39 | CRUD, email único y normalizado, validaciones |
+| `test_prestamos.py` | 61 | Préstamos, devoluciones, multas de −5 a 366 días, listados y orden de las validaciones |
+| `test_servicios.py` | 25 | Funciones de `services/` probadas directamente |
+| `test_modelos.py` | 11 | Restricciones de las tablas contra la base |
+| `test_aplicacion.py` | 6 | Arranque, `lifespan`, Swagger y manejo de errores |
+| `test_concurrencia.py` | 3 | Pedidos simultáneos: último ejemplar, máximo de 3 y doble devolución |
+
+Para correr un solo archivo o un solo test: `python -m pytest tests/test_prestamos.py -v` o `python -m pytest -k multa -v`.
+
+### 31. La multa se prueba sin esperar 14 días
+
+Los tests reemplazan la fecha de «hoy» (`dependency_overrides[obtener_fecha_hoy]`). Ejemplo: `python -m pytest -k multa -v` muestra los casos de multa 0 (a tiempo y devuelto antes), 100, 200, 1000 y 36 600 (un préstamo devuelto 366 días tarde) que no se pueden reproducir desde Swagger el mismo día (punto 26).
+
+### 32. Calidad del código
+
+`python -m pycodestyle .` no imprime nada y `python -m pyright` informa `0 errors`; ambos revisan también la carpeta `tests/`.
 
 ## Compatibilidad comprobada
 
@@ -287,3 +328,7 @@ Igual que en el punto 6: `python -m pycodestyle .` no imprime nada y `python -m 
 | Linux | 3.10, 3.12 y 3.14 | Los endpoints de préstamos con una batería de 173 comprobaciones (cada regla, el orden de las validaciones, multas de −5 a 366 días de atraso, pedidos simultáneos y pruebas de mutación), y también con las versiones más viejas que permiten los rangos de `requirements.txt`. |
 | Linux | 3.10 y 3.14 | Servidor real sobre una base creada con el código de la Etapa 3, lanzado desde otra carpeta y en una ruta con espacios y `Ñ`: datos viejos legibles, préstamos y devoluciones correctos y 25 + 30 + 20 pedidos HTTP simultáneos sin violar el stock ni el máximo. |
 | Windows (PowerShell) | 3.14 | Recorrido completo de la Etapa 4 desde Swagger. |
+| Linux | 3.10, 3.12 y 3.14 | Los 272 tests (`272 passed`) con cobertura de 99,80 % (99,79 % en 3.14); `pycodestyle` y `pyright` sin errores sobre todo el proyecto, incluida `tests/`. |
+| Linux | 3.10 y 3.14 | Los tests con las versiones más viejas que permiten los rangos de `requirements-dev.txt`. |
+| Linux | 3.10, 3.12 y 3.14 | Cada archivo de tests por separado y en orden inverso; la concurrencia, 40 veces seguidas; y 22 modificaciones deliberadas del código, todas detectadas por los tests. |
+| Windows (PowerShell) | 3.14 | Suite ejecutada con `python -m pytest --cov` en el entorno virtual del proyecto. |

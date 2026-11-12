@@ -11,10 +11,10 @@ API REST para gestionar el catálogo de una biblioteca (autores, libros y socios
 | 2 | CRUD de Autor, Libro y Socio | Finalizada |
 | 3 | Relaciones y consultas | Finalizada |
 | 4 | Préstamos y reglas de negocio | Finalizada |
-| 5 | Tests y cobertura | Pendiente |
+| 5 | Tests y cobertura | Finalizada |
 | 6 | README final y entrega | Pendiente |
 
-Hoy la aplicación crea la base de datos con las cinco tablas, expone el CRUD completo de autores, libros y socios, permite asociar autores a los libros y filtrar los libros disponibles, y registra préstamos y devoluciones aplicando las reglas de negocio (máximo de préstamos, stock, socio inactivo, vencimiento y multa).
+Hoy la aplicación crea la base de datos con las cinco tablas, expone el CRUD completo de autores, libros y socios, permite asociar autores a los libros y filtrar los libros disponibles, y registra préstamos y devoluciones aplicando las reglas de negocio (máximo de préstamos, stock, socio inactivo, vencimiento y multa). Una suite de 272 tests automáticos cubre el 99,8 % del código.
 
 ## Requisitos
 
@@ -88,19 +88,21 @@ Códigos de respuesta: **201** alta, **200** consulta y modificación, **204** b
 
 **Para probar desde Swagger:** al cargar un socio, usar un email con un dominio real o de ejemplo (`ana@example.com`). Los dominios reservados como `.test`, `.local` o `localhost` se rechazan con 422.
 
-## Chequeos de calidad (desarrollo)
+## Tests y chequeos de calidad (desarrollo)
 
 Con el entorno virtual activado:
 
 ```bash
 pip install -r requirements-dev.txt
+python -m pytest --cov
 python -m pycodestyle .
 python -m pyright
 ```
 
-`pycodestyle` no debe imprimir nada y `pyright` debe terminar con `0 errors`. La configuración de `pycodestyle` está en `setup.cfg` (líneas de hasta 88 caracteres).
+- `pytest --cov` ejecuta los 272 tests y muestra el porcentaje de cobertura por archivo. Debe terminar con `272 passed` y `Required test coverage of 80.0% reached` (hoy: 99,80 %). Si la cobertura bajara de 80 %, el comando falla.
+- `pycodestyle` no debe imprimir nada y `pyright` debe terminar con `0 errors`. La configuración está en `setup.cfg` (líneas de hasta 88 caracteres).
 
-Los tests (`pytest`) se incorporan en la Etapa 5.
+Los tests usan una base SQLite **en memoria** y una fecha de «hoy» controlada: no tocan `biblioteca.db` y no dependen del día en que se ejecuten. Más detalle en [docs/como-verificar.md](docs/como-verificar.md).
 
 ## Documentación
 
