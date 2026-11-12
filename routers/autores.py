@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from fastapi import APIRouter, status
 
 from database import SesionDep
-from models import Autor, AutorActualizar, AutorCrear, AutorLeer
+from models import Autor, AutorActualizar, AutorCrear, AutorLeer, Libro, LibroLeer
 from routers.comunes import PaginacionDep, RESPUESTA_404, RESPUESTA_409
 from services import autores as servicio
 
@@ -63,3 +63,16 @@ def actualizar_autor(
 def eliminar_autor(autor_id: int, sesion: SesionDep) -> None:
     """Elimina el autor con ese id."""
     servicio.eliminar_autor(sesion, autor_id)
+
+
+@router.get(
+    "/{autor_id}/libros",
+    response_model=list[LibroLeer],
+    summary="Libros de un autor",
+    responses={**RESPUESTA_404},
+)
+def listar_libros_de_autor(
+    autor_id: int, sesion: SesionDep, pagina: PaginacionDep
+) -> Sequence[Libro]:
+    """Devuelve los libros del autor, ordenados por id y con paginación."""
+    return servicio.listar_libros_de_autor(sesion, autor_id, pagina.skip, pagina.limit)

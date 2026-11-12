@@ -1,8 +1,9 @@
 """Endpoints de libros: alta, consulta, listado, modificación y baja."""
 
 from collections.abc import Sequence
+from typing import Annotated
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
 from database import SesionDep
 from models import Libro, LibroActualizar, LibroCrear, LibroLeer
@@ -25,9 +26,21 @@ def crear_libro(datos: LibroCrear, sesion: SesionDep) -> Libro:
 
 
 @router.get("", response_model=list[LibroLeer], summary="Listado de libros")
-def listar_libros(sesion: SesionDep, pagina: PaginacionDep) -> Sequence[Libro]:
-    """Devuelve los libros ordenados por id, con paginación."""
-    return servicio.listar_libros(sesion, pagina.skip, pagina.limit)
+def listar_libros(
+    sesion: SesionDep,
+    pagina: PaginacionDep,
+    disponibles: Annotated[
+        bool | None,
+        Query(
+            description=(
+                "true: solo libros con stock; false: solo agotados (stock 0); "
+                "sin indicar: todos"
+            )
+        ),
+    ] = None,
+) -> Sequence[Libro]:
+    """Devuelve los libros ordenados por id, con filtro y paginación."""
+    return servicio.listar_libros(sesion, pagina.skip, pagina.limit, disponibles)
 
 
 @router.get(
@@ -63,3 +76,26 @@ def actualizar_libro(
 def eliminar_libro(libro_id: int, sesion: SesionDep) -> None:
     """Elimina el libro con ese id."""
     servicio.eliminar_libro(sesion, libro_id)
+
+
+@router.post(
+    "/{libro_id}/autores/{autor_id}",
+    response_model=LibroLeer,
+    status_code=status.HTTP_201_CREATED,
+    summary="Asociar un autor a un libro",
+    responses={**RESPUESTA_404, **RESPUESTA_409},
+)
+def asociar_autor(libro_id: int, autor_id: int, sesion: SesionDep) -> Libro:
+    """Asocia el autor al libro y devuelve el libro con todos sus autores."""
+    return servicio.asociar_autor(sesion, libro_id, autor_id)
+
+
+@router.delete(
+    "/{libro_id}/autores/{autor_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Desasociar un autor de un libro",
+    responses={**RESPUESTA_404},
+)
+def desasociar_autor(libro_id: int, autor_id: int, sesion: SesionDep) -> None:
+    """Quita la asociación entre el libro y el autor."""
+    servicio.desasociar_autor(sesion, libro_id, autor_id)

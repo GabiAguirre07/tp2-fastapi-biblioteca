@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from sqlmodel import Session, col, select
 
-from models import Autor, AutorActualizar, AutorCrear
+from models import Autor, AutorActualizar, AutorCrear, Libro, LibroAutor
 from services.comunes import eliminar, guardar, obtener_o_404
 from services.excepciones import ConflictoDeNegocio
 
@@ -44,3 +44,23 @@ def eliminar_autor(sesion: Session, autor_id: int) -> None:
             "asociados. Desasocie primero sus libros."
         )
     eliminar(sesion, autor)
+
+
+def listar_libros_de_autor(
+    sesion: Session, autor_id: int, skip: int, limit: int
+) -> Sequence[Libro]:
+    """Devuelve una página de los libros de un autor, ordenados por id.
+
+    Lanza RecursoNoEncontrado si el autor no existe (404). Cada libro
+    incluye todos sus autores, no solo el consultado.
+    """
+    obtener_o_404(sesion, Autor, autor_id)
+    consulta = (
+        select(Libro)
+        .join(LibroAutor, col(LibroAutor.libro_id) == col(Libro.id))
+        .where(col(LibroAutor.autor_id) == autor_id)
+        .order_by(col(Libro.id))
+        .offset(skip)
+        .limit(limit)
+    )
+    return sesion.exec(consulta).all()

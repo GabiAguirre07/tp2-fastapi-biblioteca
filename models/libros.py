@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import CheckConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
+from models.autores import Autor, AutorLeer
 from models.comunes import ActualizacionParcial, IsbnTexto, TituloTexto
 from models.libro_autor import LibroAutor
 
 if TYPE_CHECKING:
-    from models.autores import Autor
     from models.prestamos import Prestamo
 
 # Año de la imprenta de tipos móviles: ningún libro puede ser anterior.
@@ -38,6 +38,10 @@ class Libro(LibroBase, table=True):
     Las validaciones de LibroBase no se ejecutan en las clases tabla, por eso
     el stock no negativo y el año mínimo se refuerzan con restricciones CHECK
     en la base. El año máximo no se refuerza ahí porque cambia con el tiempo.
+
+    Los autores se cargan siempre junto con el libro (lazy="selectin": una
+    segunda consulta por lote, no una por libro) y ordenados por id, porque
+    todas las respuestas de libro los incluyen.
     """
 
     __table_args__ = (
@@ -46,8 +50,10 @@ class Libro(LibroBase, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    autores: list["Autor"] = Relationship(
-        back_populates="libros", link_model=LibroAutor
+    autores: list[Autor] = Relationship(
+        back_populates="libros",
+        link_model=LibroAutor,
+        sa_relationship_kwargs={"lazy": "selectin", "order_by": "Autor.id"},
     )
     prestamos: list["Prestamo"] = Relationship(back_populates="libro")
 
@@ -66,6 +72,7 @@ class LibroActualizar(ActualizacionParcial):
 
 
 class LibroLeer(LibroBase):
-    """Esquema de salida: los campos del libro más su id."""
+    """Esquema de salida: los campos del libro, su id y sus autores."""
 
     id: int
+    autores: list[AutorLeer]
