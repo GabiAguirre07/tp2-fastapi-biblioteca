@@ -1,4 +1,4 @@
-"""Modelo de la entidad Préstamo."""
+"""Modelos y esquemas de la entidad Préstamo."""
 
 from datetime import date
 from typing import TYPE_CHECKING
@@ -27,3 +27,33 @@ class Prestamo(SQLModel, table=True):
 
     socio: "Socio" = Relationship(back_populates="prestamos")
     libro: "Libro" = Relationship(back_populates="prestamos")
+
+
+class PrestamoCrear(SQLModel):
+    """Esquema de entrada para pedir un préstamo.
+
+    El cliente solo indica quién y qué libro: las fechas y la multa las
+    decide el servidor, no se aceptan del cliente.
+    """
+
+    socio_id: int
+    libro_id: int
+
+
+class PrestamoLeer(SQLModel):
+    """Esquema de salida: el préstamo más dos datos calculados al responder."""
+
+    id: int
+    socio_id: int
+    libro_id: int
+    fecha_prestamo: date
+    fecha_vencimiento: date
+    fecha_devolucion: date | None
+    multa: int
+    vencido: bool = Field(
+        description="true si sigue sin devolverse y ya pasó su vencimiento"
+    )
+    dias_atraso: int = Field(
+        description="Días de atraso: hasta hoy si está activo, o hasta la "
+        "devolución si ya se devolvió"
+    )

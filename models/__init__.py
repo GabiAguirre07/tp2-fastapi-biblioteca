@@ -9,7 +9,7 @@ from models.libros import (
     LibroCrear,
     LibroLeer,
 )
-from models.prestamos import Prestamo
+from models.prestamos import Prestamo, PrestamoCrear, PrestamoLeer
 from models.socios import (
     Socio,
     SocioActualizar,
@@ -31,6 +31,8 @@ __all__ = [
     "LibroCrear",
     "LibroLeer",
     "Prestamo",
+    "PrestamoCrear",
+    "PrestamoLeer",
     "Socio",
     "SocioActualizar",
     "SocioBase",

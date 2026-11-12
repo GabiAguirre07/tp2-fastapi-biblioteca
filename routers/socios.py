@@ -1,12 +1,19 @@
 """Endpoints de socios: alta, consulta, listado, modificación y baja."""
 
 from collections.abc import Sequence
+from typing import Annotated
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
 from database import SesionDep
-from models import Socio, SocioActualizar, SocioCrear, SocioLeer
-from routers.comunes import PaginacionDep, RESPUESTA_404, RESPUESTA_409
+from models import PrestamoLeer, Socio, SocioActualizar, SocioCrear, SocioLeer
+from routers.comunes import (
+    FechaHoyDep,
+    PaginacionDep,
+    RESPUESTA_404,
+    RESPUESTA_409,
+)
+from services import prestamos as servicio_prestamos
 from services import socios as servicio
 
 router = APIRouter(prefix="/socios", tags=["Socios"])
@@ -63,3 +70,31 @@ def actualizar_socio(
 def eliminar_socio(socio_id: int, sesion: SesionDep) -> None:
     """Elimina el socio con ese id."""
     servicio.eliminar_socio(sesion, socio_id)
+
+
+@router.get(
+    "/{socio_id}/prestamos",
+    response_model=list[PrestamoLeer],
+    summary="Préstamos de un socio",
+    responses={**RESPUESTA_404},
+)
+def listar_prestamos_de_socio(
+    socio_id: int,
+    sesion: SesionDep,
+    pagina: PaginacionDep,
+    hoy: FechaHoyDep,
+    activos: Annotated[
+        bool | None,
+        Query(
+            description=(
+                "true: solo préstamos sin devolver; false: solo devueltos; "
+                "sin indicar: todos"
+            )
+        ),
+    ] = None,
+) -> list[PrestamoLeer]:
+    """Devuelve los préstamos del socio ordenados por id, con paginación."""
+    prestamos = servicio_prestamos.listar_prestamos_de_socio(
+        sesion, socio_id, pagina.skip, pagina.limit, activos
+    )
+    return [servicio_prestamos.a_lectura(prestamo, hoy) for prestamo in prestamos]

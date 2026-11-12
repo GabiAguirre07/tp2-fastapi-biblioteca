@@ -19,3 +19,7 @@ class RecursoNoEncontrado(ErrorDeNegocio):
 
 class ConflictoDeNegocio(ErrorDeNegocio):
     """La operación choca con el estado de los datos (se traduce a 409)."""
+
+
+class OperacionNoPermitida(ErrorDeNegocio):
+    """Quien pide la operación no está habilitado para hacerla (403)."""

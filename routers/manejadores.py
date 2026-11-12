@@ -6,14 +6,16 @@ from fastapi.responses import JSONResponse
 from services.excepciones import (
     ConflictoDeNegocio,
     ErrorDeNegocio,
+    OperacionNoPermitida,
     RecursoNoEncontrado,
 )
 
-# Código HTTP de cada error de negocio. Para sumar un error nuevo (por
-# ejemplo el 403 de la Etapa 4) alcanza con agregar una línea acá.
+# Código HTTP de cada error de negocio. Para sumar un error nuevo alcanza
+# con agregar una línea acá.
 CODIGOS_HTTP: dict[type[ErrorDeNegocio], int] = {
     RecursoNoEncontrado: status.HTTP_404_NOT_FOUND,
     ConflictoDeNegocio: status.HTTP_409_CONFLICT,
+    OperacionNoPermitida: status.HTTP_403_FORBIDDEN,
 }
 
 
