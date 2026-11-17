@@ -152,7 +152,7 @@ Al probar los ids límite se vio que, desde la Etapa 2, `GET /socios/99999999999
 76. **`fail_under = 80` en `setup.cfg`.** El umbral de la consigna queda como regla ejecutable: si la cobertura baja de 80 %, `pytest --cov` termina con error.
 77. **La regla 4 (vencimiento a 14 días) tiene un solo test** porque no tiene un caso de error; la regla 5 (devolución y multa) tiene dos casos felices, a tiempo y con atraso.
 78. **Un test comprueba que `biblioteca.db` no se crea ni se modifica** durante la corrida, para que la garantía de la decisión 67 no dependa de la memoria de nadie.
-79. **Una sola línea sin cubrir a propósito:** `routers/manejadores.py`, línea 25 (`raise error`). Es una defensa que ningún pedido real puede alcanzar; cubrirla exigiría fabricar una situación artificial.
+79. **Una sola línea sin cubrir a propósito:** `routers/manejadores.py`, línea 27 (`raise error`). Es una defensa que ningún pedido real puede alcanzar; cubrirla exigiría fabricar una situación artificial.
 80. **Nombres descriptivos y estructura preparar → actuar → comprobar** en cada test, para que el nombre diga qué regla se prueba y qué se espera.
 
 ### Resultado y verificación

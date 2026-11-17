@@ -284,7 +284,7 @@ pip install -r requirements-dev.txt
 python -m pytest --cov
 ```
 
-**Resultado esperado:** al final, `272 passed`, una tabla de cobertura por archivo con un total de **99 %** (99,80 %) y la línea `Required test coverage of 80.0% reached`. La única línea sin cubrir es `routers/manejadores.py:25`, a propósito (ver la decisión 79). Dura unos 15 segundos.
+**Resultado esperado:** al final, todos los tests en verde (`339 passed` desde la Etapa 7; al cerrar la Etapa 5 eran 272, ver el punto 33), una tabla de cobertura por archivo con un total de **99 %** y la línea `Required test coverage of 80.0% reached`. La única línea sin cubrir es `routers/manejadores.py:27`, a propósito (ver la decisión 79). Dura entre 20 y 40 segundos.
 
 ### 29. Los tests no tocan la base real
 

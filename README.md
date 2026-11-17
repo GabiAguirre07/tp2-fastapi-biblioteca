@@ -20,6 +20,8 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
+Si `python` no se reconoce o abre la Microsoft Store, usar el lanzador de Python para Windows: `py -m venv .venv`.
+
 Si PowerShell bloquea la activación por la política de ejecución, habilitarla solo para esa ventana con
 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` y volver a activar.
 
@@ -38,6 +40,9 @@ python -m uvicorn main:app --reload
 ```
 
 Con la aplicación en marcha, abrir <http://127.0.0.1:8000/docs> (Swagger). El archivo `biblioteca.db` se crea solo, junto al código, la primera vez que arranca: no hace falta ningún paso manual ni variables de entorno. Para detener la aplicación: `Ctrl + C`.
+
+- Si el puerto 8000 está ocupado: `python -m uvicorn main:app --reload --port 8001` (y abrir `http://127.0.0.1:8001/docs`).
+- La página `/docs` descarga Swagger UI de internet (`cdn.jsdelivr.net`): sin conexión se ve en blanco, aunque la API funciona igual.
 
 **Para empezar con datos vacíos:** detener la aplicación y borrar `biblioteca.db` (`Remove-Item biblioteca.db` en PowerShell, `rm biblioteca.db` en bash). Se vuelve a crear al arrancar.
 
